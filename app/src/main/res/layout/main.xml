@@ -190,16 +190,6 @@
                     android:background="@drawable/btn_style"
                     ></Button>
                 <Button
-                    android:id="@+id/btn_daohang"
-                    android:layout_weight="1"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:textSize="@dimen/size_15sp"
-                    android:gravity="center"
-                    android:text="开始导航"
-                    android:background="@drawable/btn_style"
-                    android:visibility="gone"></Button>
-                <Button
                     android:id="@+id/btn_clear"
                     android:layout_weight="1"
                     android:layout_width="match_parent"
@@ -209,17 +199,84 @@
                     android:text="清空地图"
                     android:background="@drawable/btn_style"
                     ></Button>
+                <Button
+                    android:id="@+id/set_ip"
+                    android:layout_weight="1"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:textSize="@dimen/size_15sp"
+                    android:gravity="center"
+                    android:text="设置IP"
+                    android:background="@drawable/btn_style"
+                    ></Button>
+                <Button
+                    android:id="@+id/btn_area_find"
+                    android:layout_weight="1"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:textSize="@dimen/size_15sp"
+                    android:gravity="center"
+                    android:text="区域查询"
+                    android:background="@drawable/btn_style"
+                    />
             </LinearLayout>
         </LinearLayout>
 
     </LinearLayout>
-    <com.baidu.mapapi.map.MapView
-        android:id="@+id/bmapView"
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginTop="5dp"
-        android:clickable="true"
-        />
+        android:layout_marginTop="5dp">
+        <com.baidu.mapapi.map.MapView
+            android:id="@+id/bmapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="5dp"
+            android:clickable="true"
+            />
+        <LinearLayout
+            android:id="@+id/linear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentTop="true"
+            android:background="@color/white">
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:orientation="horizontal" >
+                <TextView
+                    android:layout_width="70dp"
+                    android:layout_height="match_parent"
+                    android:text="LAC_SID"
+                    android:textSize="@dimen/text_size_16"
+                    android:gravity="center"
+                    android:textColor="@color/black"/>
+                <TextView
+                    android:layout_width="60dp"
+                    android:layout_height="match_parent"
+                    android:text="CI_NID"
+                    android:textSize="@dimen/text_size_16"
+                    android:gravity="center"
+                    android:textColor="@color/black"/>
+                <TextView
+                    android:layout_width="60dp"
+                    android:layout_height="match_parent"
+                    android:text="BID"
+                    android:textSize="@dimen/text_size_16"
+                    android:gravity="center"
+                    android:textColor="@color/black"/>
+            </LinearLayout>
+            <ListView
+                android:id="@+id/neibor_list"
+                android:layout_width="180dp"
+                android:layout_height="wrap_content"
+                android:layout_alignParentLeft="true"
+                android:layout_alignParentTop="true"
+                />
+        </LinearLayout>
+    </RelativeLayout>
    <!--<LinearLayout-->
        <!--android:layout_width="match_parent"-->
        <!--android:layout_height="match_parent"-->

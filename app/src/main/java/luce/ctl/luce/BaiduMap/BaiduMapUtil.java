@@ -122,8 +122,9 @@ public class BaiduMapUtil {
         OverlayOptions polygonOption = new PolygonOptions()
                 .points(latLngs)
                 .stroke(new Stroke(5, 0xff00ffff))
-                .fillColor(0x80ffffff);//0xffffff00
-        mBaiduMap.addOverlay(polygonOption);
+                .fillColor(0);//0x80ffffff
+        MainActivity.overlays.add(mBaiduMap.addOverlay(polygonOption));
+//        mBaiduMap.addOverlay(polygonOption);
         MainActivity.showList.add(polygonOption);
     }
 
