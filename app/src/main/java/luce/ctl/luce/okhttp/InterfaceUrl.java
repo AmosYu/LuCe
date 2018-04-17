@@ -5,9 +5,15 @@ package luce.ctl.luce.okhttp;
  */
 
 public class InterfaceUrl {
-    private static String ip="";
+    private String ip="";
     public InterfaceUrl(String Ip) {
         this.ip=Ip;
     }
-    public static final String BASEURL = "http://"+ip+"/collect/DataDLServlet";
+    public String BASEURL = "";
+
+    public String getBASEURL() {
+        String url="http://"+ip+"/collect/DataDLServlet";
+        BASEURL=url;
+        return BASEURL;
+    }
 }

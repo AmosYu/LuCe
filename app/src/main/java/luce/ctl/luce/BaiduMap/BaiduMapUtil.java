@@ -123,7 +123,7 @@ public class BaiduMapUtil {
                 .points(latLngs)
                 .stroke(new Stroke(5, 0xff00ffff))
                 .fillColor(0);//0x80ffffff
-        MainActivity.overlays.add(mBaiduMap.addOverlay(polygonOption));
+        mBaiduMap.addOverlay(polygonOption);
 //        mBaiduMap.addOverlay(polygonOption);
         MainActivity.showList.add(polygonOption);
     }

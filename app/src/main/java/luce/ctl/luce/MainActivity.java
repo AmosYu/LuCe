@@ -1,15 +1,19 @@
 package luce.ctl.luce;
 
+import android.Manifest;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.MessageQueue;
 import android.support.annotation.RequiresApi;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.InputType;
@@ -30,13 +34,16 @@ import android.widget.Toast;
 
 import com.baidu.mapapi.SDKInitializer;
 import com.baidu.mapapi.map.BaiduMap;
+import com.baidu.mapapi.map.BitmapDescriptor;
+import com.baidu.mapapi.map.BitmapDescriptorFactory;
 import com.baidu.mapapi.map.InfoWindow;
+import com.baidu.mapapi.map.MapPoi;
 import com.baidu.mapapi.map.MapStatus;
 import com.baidu.mapapi.map.MapStatusUpdate;
 import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
 import com.baidu.mapapi.map.Marker;
-import com.baidu.mapapi.map.Overlay;
+import com.baidu.mapapi.map.MarkerOptions;
 import com.baidu.mapapi.map.OverlayOptions;
 import com.baidu.mapapi.map.PolygonOptions;
 import com.baidu.mapapi.map.Stroke;
@@ -63,6 +70,7 @@ import luce.ctl.luce.BaiduMap.ConvexHull;
 import luce.ctl.luce.adapter.LacDataAdapter;
 import luce.ctl.luce.okhttp.InterfaceUrl;
 import luce.ctl.luce.okhttp.OkHttpManager;
+import luce.ctl.luce.ui.LuCeDataList;
 import luce.ctl.luce.ui.LuceCellInfo;
 import luce.ctl.luce.utils.AlrDialog_Show;
 import luce.ctl.luce.utils.ArrayUtils;
@@ -85,8 +93,12 @@ public class MainActivity extends AppCompatActivity {
     private BaiduMap mBaiduMap=null;
 
     private Spinner mncSpinner;
+    private Spinner modeSpinner;
     private String[] modes={"中国移动","中国联通","中国电信2G","中国电信4G"};
+    private String zhishi_mode="GSM";
+    private String[] zhishis={"GSM","LTE","WCDMA","CDMA","TD-SCDMA","WIFI"};
     private ArrayAdapter mncAdapter;
+    private ArrayAdapter zhishiAdapter;
 
     private TextView lac_text;
     private TextView cell_text;
@@ -117,13 +129,18 @@ public class MainActivity extends AppCompatActivity {
     String nid="";
     String bid="";
     BaiduMapUtil baiduMapUtil;
-    private OkHttpManager okHttpManager;
     public static List<OverlayOptions> showList=new ArrayList<>();
-    public static List<Overlay> overlays=new ArrayList<>();
-    private static String ip="";
-    private Handler handler;
-    private List<Object> jsonList=new ArrayList<>();
-    private List<Point> list_neibor_latlon=new ArrayList<>();//用来保存查询到的每个基站的其中一个数据
+    public List<OverlayOptions> list_curent_overlayoptions=new ArrayList<>();//现在地图上显示的图层
+    private String ip="";
+//    private Handler handler;
+    private List<Point> list_neibor_latlon=new ArrayList<>();//用来保存查询到的每个基站的其中一个数据,为了覆盖时使用经纬度
+    private List<List<Point>> showList_latLngs=new ArrayList<>();//用于保存每个图层中的基站数据
+    private List<List<String>> showList_rssi=new ArrayList<>();
+    private int marker=0;
+    private List<LatLng> marker_latlng=new ArrayList<>();//对地图上的两个标记点进行保存
+    private Workhandler workhandler;
+    private InterfaceUrl interfaceUrl;
+    private List<LuCeDataList> luCeDataLists=new ArrayList<>();//用来存放区域查询得到的数据
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -133,15 +150,16 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.main);
 
         context=this;
-        okHttpManager=OkHttpManager.getInstance();
         initView();
         bindEvent();
     }
 
 
     private void initView() {
+        myPermission();
         mMapView=(MapView) findViewById(R.id.bmapView);
         initModeSpinner();
+        initZhiShiSpinner();
         lac_text=(TextView)findViewById(R.id.lac_text_id);
         cell_text=(TextView)findViewById(R.id.cell_text_id);
         bid_liner=(LinearLayout)findViewById(R.id.bid_liner);
@@ -165,6 +183,7 @@ public class MainActivity extends AppCompatActivity {
         baiduMapUtil=new BaiduMapUtil(context,mBaiduMap);
         //普通地图
         mBaiduMap.setMapType(BaiduMap.MAP_TYPE_NORMAL);
+        //marker的点击事件
         mBaiduMap.setOnMarkerClickListener(new BaiduMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
@@ -178,6 +197,39 @@ public class MainActivity extends AppCompatActivity {
                 InfoWindow mInfoWindow = new InfoWindow(button, ll, -47);
                 mBaiduMap.showInfoWindow(mInfoWindow);
                 return true;
+            }
+        });
+        //百度地图的单击事件
+        mBaiduMap.setOnMapLongClickListener(new BaiduMap.OnMapLongClickListener() {
+            @Override
+            public void onMapLongClick(LatLng latLng) {
+                BitmapDescriptor bitmap=null;
+                if (marker==0){
+                    //构建Marker图标
+                    bitmap = BitmapDescriptorFactory
+                            .fromResource(R.drawable.icon_marka);
+                    OverlayOptions option = new MarkerOptions()
+                            .position(latLng)
+                            .icon(bitmap);
+                    mBaiduMap.addOverlay(option);
+                    marker++;
+                    marker_latlng.add(latLng);
+                }else if (marker==1){
+                    bitmap = BitmapDescriptorFactory
+                            .fromResource(R.drawable.icon_markb);
+                    OverlayOptions option = new MarkerOptions()
+                            .position(latLng)
+                            .icon(bitmap);
+                    mBaiduMap.addOverlay(option);
+                    marker++;
+                    marker_latlng.add(latLng);
+                }else if (marker>1){
+                    AlertDialog.Builder builder=new AlertDialog.Builder(context)
+                            .setTitle("提示")
+                            .setMessage("最多只能添加两个标注点")
+                            .setPositiveButton("确定",null);
+                    builder.show();
+                }
             }
         });
     }
@@ -209,15 +261,11 @@ public class MainActivity extends AppCompatActivity {
                 start_flg=GetRequestParam();
                 String filePath = Environment.getExternalStorageDirectory().getPath()+ File.separator+"LuCeIp.txt";
                 File file=new File(filePath);
-                ip="192.168.1.112";
                 if (file.exists()){
-                    byte[] bytes=read(file);
-//                    ip=bytes.toString();
-                    ip="192.168.1.112";
+                    ip=read(file);
                 }
-//                ip=SharedPreferencesHandler.getDataFromPref(context,"luce_ip","");
                 if(!(ip.equals("")||ip=="")){
-                    InterfaceUrl url=new InterfaceUrl(ip);
+                   interfaceUrl=new InterfaceUrl(ip);
                     if(start_flg==true)
                     {
                         if (find()){
@@ -252,6 +300,17 @@ public class MainActivity extends AppCompatActivity {
                 {
                     mBaiduMap.clear();
                     showList.clear();
+                    marker=0;
+                    lac="";
+                    cellid="";
+                    sid="";
+                    nid="";
+                    bid="";
+                    marker_latlng.clear();
+                    list_curent_overlayoptions.clear();
+                    list_neibor_latlon.clear();
+                    showList_latLngs.clear();
+                    showList_rssi.clear();
                     luceCellInfos.clear();
                     lacDataAdapter.notifyDataSetChanged();
                 }
@@ -287,37 +346,485 @@ public class MainActivity extends AppCompatActivity {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                final double[] latlon= GPSUtils.wgs2bd(Double.valueOf(list_neibor_latlon.get(i).getLat()),Double.valueOf(list_neibor_latlon.get(i).getLon()));
-                LatLng cenpt = new LatLng(latlon[0],latlon[1]);
-                //定义地图状态
-                MapStatus mMapStatus = new MapStatus.Builder()
-                        .target(cenpt)
-                        .zoom(15)
-                        .build();
-                //定义MapStatusUpdate对象，以便描述地图状态将要发生的变化
+                final int current_position=i;
+                AlertDialog.Builder builder=new AlertDialog.Builder(context)
+                        .setTitle("请选择")
+                        .setMessage("请选择是覆盖显示还是单个显示,数据加载过程需要一定的时间，不要进行重复点击")
+                        .setPositiveButton("覆盖", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                OverlayOptions options=showList.get(current_position);
+                                for (int m=0;m<list_curent_overlayoptions.size();m++){
+                                    if (list_curent_overlayoptions.get(m)==options){//说明地图上现在有该图层
+                                        final double[] latlon= GPSUtils.wgs2bd(Double.valueOf(list_neibor_latlon.get(current_position).getLat()),Double.valueOf(list_neibor_latlon.get(current_position).getLon()));
+                                        LatLng cenpt = new LatLng(latlon[0],latlon[1]);
+                                        //定义地图状态
+                                        MapStatus mMapStatus = new MapStatus.Builder()
+                                                .target(cenpt)
+                                                .zoom(15)
+                                                .build();
+                                        //定义MapStatusUpdate对象，以便描述地图状态将要发生的变化
 
-                MapStatusUpdate mMapStatusUpdate = MapStatusUpdateFactory.newMapStatus(mMapStatus);
-                //改变地图状态
-                mBaiduMap.setMapStatus(mMapStatusUpdate);
-                for (int j=0;j<overlays.size();j++){
-                    if (!(j==i)){
-                        overlays.get(j).setVisible(false);
-                    }
-                }
-                mMapView.refreshDrawableState();
+                                        MapStatusUpdate mMapStatusUpdate = MapStatusUpdateFactory.newMapStatus(mMapStatus);
+                                        //改变地图状态
+                                        mBaiduMap.setMapStatus(mMapStatusUpdate);
+                                        break;
+                                    }else {//说明地图上现在没有该图层
+                                        List<Point> current_list=showList_latLngs.get(current_position);
+                                        int max_rssi=Integer.valueOf(showList_rssi.get(current_position).get(0));
+                                        int min_rssi=Integer.valueOf(showList_rssi.get(current_position).get(0));
+                                        for (int a=0;a<showList_rssi.get(current_position).size()-1;a++){
+                                            int current=Integer.valueOf(showList_rssi.get(current_position).get(a));
+                                            if (current>max_rssi){
+                                                max_rssi=current;
+                                            } else if (current<min_rssi){
+                                                min_rssi=current;
+                                            }
+                                        }
+                                        for (int b=0;b<current_list.size();b++){
+                                            int rssi_rgb=(Integer.valueOf(current_list.get(b).getRssi())-min_rssi)*100/(max_rssi-min_rssi);
+                                            final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(current_list.get(b).getLat()),Double.valueOf(current_list.get(b).getLon()));
+                                            if (!((int)latlon1[0]==0&&(int)latlon1[1]==0)){
+                                                baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+parameters[0]+","+parameters[1]+","+parameters[2]+"\n"
+                                                        +Double.valueOf(current_list.get(b).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                                            }
+                                        }
+                                        mBaiduMap.addOverlay(showList.get(current_position));
+                                        list_curent_overlayoptions.add(showList.get(current_position));
+                                        break;
+                                    }
+                                }
+                            }
+                        })
+                        .setNegativeButton("单独显示", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int position) {
+                                mBaiduMap.clear();
+                                list_curent_overlayoptions.clear();
+                                List<Point> current_list=showList_latLngs.get(current_position);
+                                int max_rssi=Integer.valueOf(showList_rssi.get(current_position).get(0));
+                                int min_rssi=Integer.valueOf(showList_rssi.get(current_position).get(0));
+                                for (int i=0;i<showList_rssi.get(current_position).size()-1;i++){
+                                    int current=Integer.valueOf(showList_rssi.get(current_position).get(i));
+                                    if (current>max_rssi){
+                                        max_rssi=current;
+                                    } else if (current<min_rssi){
+                                        min_rssi=current;
+                                    }
+                                }
+                                for (int i=0;i<current_list.size();i++){
+                                    int rssi_rgb=(Integer.valueOf(current_list.get(i).getRssi())-min_rssi)*100/(max_rssi-min_rssi);
+                                    final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(current_list.get(i).getLat()),Double.valueOf(current_list.get(i).getLon()));
+                                    if (!((int)latlon1[0]==0&&(int)latlon1[1]==0)){
+                                        baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+parameters[0]+","+parameters[1]+","+parameters[2]+"\n"
+                                                +Double.valueOf(current_list.get(i).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                                    }
+                                }
+                                OverlayOptions options=showList.get(current_position);
+                                mBaiduMap.addOverlay(options);
+                                list_curent_overlayoptions.add(options);
+                            }
+                        });
+                builder.show();
             }
+
         });
         area_btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                AlertDialog.Builder builder=new AlertDialog.Builder(context)
-                        .setTitle("提示")
-                        .setMessage("请在地图上选择一个或两个区域标记点")
-                        .setPositiveButton("确定",null);
-                builder.show();
+                String filePath = Environment.getExternalStorageDirectory().getPath()+ File.separator+"LuCeIp.txt";
+                File file=new File(filePath);
+                if (file.exists()){
+                    ip=read(file);
+                }
+                if(!(ip.equals("")||ip=="")){
+                    interfaceUrl=new InterfaceUrl(ip);
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Looper.prepare();//必须在Looper.myLooper()之前
+                            Looper looperTest = Looper.myLooper();
+                            workhandler = new Workhandler(looperTest);//mWorkHandler属于新创建的线程
+                            area_search(marker_latlng);
+                            Looper.loop();
+                        }
+                    }).start();
+                    TimerProgressDialog timerDialog = new TimerProgressDialog(context,10000,"开始下载数据","正在加载数据请稍等");
+                    timerDialog.show();
+                }else {
+                    AlertDialog.Builder builder=new AlertDialog.Builder(context);
+                    builder.setTitle("提示");
+                    builder.setMessage("请先写入IP");
+                    builder.setPositiveButton("确定",null);
+                    builder.show();
+                }
+            }
+        });
+
+    }
+    private void area_search(List<LatLng> latLngs){
+        Map<String, String> params = new HashMap<>();
+        params.put("mcc", mcc );
+        params.put("mnc", mnc );
+        params.put("system",zhishi_mode);
+        if (latLngs.size()==1){//标注一个点
+            params.put("lon1", String.valueOf(latLngs.get(0).longitude));
+            params.put("lat1", String.valueOf(latLngs.get(0).latitude) );
+        }else if (latLngs.size()==2){//添加了两个标注
+            params.put("lon1", String.valueOf(latLngs.get(0).longitude));
+            params.put("lat1", String.valueOf(latLngs.get(0).latitude) );
+            params.put("lon2", String.valueOf(latLngs.get(1).longitude));
+            params.put("lat2", String.valueOf(latLngs.get(1).latitude) );
+        }
+        OkHttpClient okHttpClient = new OkHttpClient();
+        FormBody.Builder builder1 = new FormBody.Builder();
+        if (params != null) {
+            for (Map.Entry<String, String> entry : params.entrySet()) {
+                builder1.add(entry.getKey(), entry.getValue());
+            }
+        }
+//        Looper looper = Looper.getMainLooper(); //主线程的Looper对象
+//        workhandler = new Workhandler(looper);
+
+        RequestBody requestBody =  builder1.build();
+        Request.Builder builder = new Request.Builder();
+        String URL=interfaceUrl.getBASEURL();
+        builder.url(URL);
+        builder.post(requestBody);
+        Call call  = okHttpClient.newCall(builder.build());
+        call.enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Message msg = handler .obtainMessage(0,0,4,null);
+                handler .sendMessage(msg);
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                try {
+                    if(response.isSuccessful()){
+                        InputStream is = response.body().byteStream();
+                        int datalength = 0;
+                        int reccount = 0;
+                        boolean headread = false;
+                        int sublen = -1;
+
+                        byte[] bArr = new byte[1024 *6];
+                        byte[] msgBuffer = new byte[0];
+
+                        int size = is.read(bArr, 0, (int) bArr.length);
+                        msgBuffer = ArrayUtils.append(msgBuffer, ArrayUtils.subArray(bArr, 0,size));
+                        int i=0;
+                        while (size > 0 || msgBuffer.length > 0) {
+//                            int pointer_package = 0;
+                            if (size > 0) {
+                                size = is.read(bArr, 0, (int) bArr.length);
+                            }
+                            if (size > 0) {
+                                msgBuffer = ArrayUtils.append(msgBuffer, ArrayUtils.subArray(bArr,0, size));
+                            }
+
+                            if (!headread && msgBuffer.length >= 4) {
+                                byte[] alllength = ArrayUtils.subArray(msgBuffer, 0, 4);
+                                datalength = (alllength[3] & 0xff) * 256 * 256 * 256
+                                        + (alllength[2] & 0xff) * 256 * 256
+                                        + (alllength[1] & 0xff) * 256
+                                        + (alllength[0] & 0xff);
+                                msgBuffer = ArrayUtils.subArray(msgBuffer, 4, msgBuffer.length - 4);
+//                                pointer_package += 4;
+                                headread = true;
+                            }
+                            if (headread) {
+                                //头长度已读
+                                if (msgBuffer.length >= 4 && sublen < 0) {
+                                    byte[] sublength = ArrayUtils.subArray(msgBuffer, 0, 4);
+                                    sublen = (sublength[3] & 0xff) * 256 * 256 * 256
+                                            + (sublength[2] & 0xff) * 256 * 256
+                                            + (sublength[1] & 0xff) * 256
+                                            + (sublength[0] & 0xff);
+                                    msgBuffer = ArrayUtils.subArray(msgBuffer, 4, msgBuffer.length - 4);
+//                                    pointer_package += 4;
+                                }
+                                if (msgBuffer.length >= sublen&&sublen>0) {
+                                    i++;
+                                    byte[] subdata = ArrayUtils.subArray(msgBuffer, 0, sublen);
+                                    msgBuffer = ArrayUtils.subArray(msgBuffer, sublen, msgBuffer.length - sublen);
+                                    sublen = -1;
+                                    //数据处理
+                                    String json=new String(subdata);
+                                    JSONObject object=new JSONObject(json);
+                                    JSONArray array=object.getJSONArray("datalist");
+                                    reccount+=array.length();
+
+                                    Message message = Message.obtain();
+                                    message.arg1=reccount;
+                                    message.arg2=datalength;
+                                    message.obj=object;
+                                    workhandler.sendMessage(message);//此时是在另一个线程，通过直接访问新线程中的变量向 TestHandlerThread发送消息
+                                }
+                            }
+                        }
+                    }
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
             }
         });
     }
+    private int one_package=0;
+    public class Workhandler extends Handler {
+        public Workhandler(Looper looper) {
+            super(looper);
+        }
+        public void handleMessage(Message msg) {
+            int count_sum=msg.arg2;
+            if (msg.arg1>0){
+                one_package=msg.arg1;
+                JSONObject object=(JSONObject) msg.obj;
+                try {
+                    JSONArray array=object.getJSONArray("datalist");
+                    for (int i=0;i<array.length();i++){
+                        JSONObject jsonObject= (JSONObject) array.opt(i);
+                        Point point=new Point();
+                        String lon=jsonObject.getString("longdot");
+                        String lat=jsonObject.getString("latdot");
+                        point.setLat(lat);
+                        point.setLon(lon);
+                        if (jsonObject.has("address")){
+                            if (!(jsonObject.getString("address").equals("")||jsonObject.getString("address")==null)){
+                                point.setAcc(jsonObject.getString("address"));
+                            }
+                        }
+                        if (jsonObject.has("power")){
+                            if (!(jsonObject.getString("power").equals("")||jsonObject.getString("power")==null)){
+                                point.setRssi(jsonObject.getString("power"));
+                            }
+                        }
+                        if (jsonObject.has("p1")){
+                            if (!(jsonObject.getString("p1").equals("")||jsonObject.getString("p1")==null)){
+                                point.setP1(jsonObject.getString("p1"));
+                            }
+                        }
+                        if (jsonObject.has("p2")){
+                            if (!(jsonObject.getString("p2").equals("")||jsonObject.getString("p2")==null)){
+                                point.setP2(jsonObject.getString("p2"));
+                            }
+                        }
+                        if (jsonObject.has("p3")){
+                            if (!(jsonObject.getString("p3").equals("")||jsonObject.getString("p3")==null)){
+                                point.setP3(jsonObject.getString("p3"));
+                            }
+                        }
+                        if (luCeDataLists.size()==0){
+                            LuCeDataList luCeDataList=new LuCeDataList();
+                            luCeDataList.setLac_sid(point.getP1());
+                            luCeDataList.setCi_nid(point.getP2());
+                            luCeDataList.setBid(point.getP3());
+                            luCeDataList.setColor(0xff00ffff);
+                            luCeDataList.getList().add(point);
+                            luCeDataLists.add(luCeDataList);
+                        }else {
+                            boolean flag=false;
+                            for (int k=0;k<luCeDataLists.size();k++){
+                                if (point.getP1().equals(luCeDataLists.get(k).getLac_sid())&&point.getP2().equals(luCeDataLists.get(k).getCi_nid())) {
+                                    LuCeDataList luCeDataList = luCeDataLists.get(k);
+                                    luCeDataList.getList().add(point);
+                                    flag = true;
+                                    break;
+                                }
+                            }
+                            if (!flag){
+                                    LuCeDataList luCeDataList=new LuCeDataList();
+                                    luCeDataList.setLac_sid(point.getP1());
+                                    luCeDataList.setCi_nid(point.getP2());
+                                    luCeDataList.setBid(point.getP3());
+                                    if (luCeDataLists.size()==1||luCeDataLists.size()>1){
+                                        if (luCeDataLists.size()<7){
+                                            luCeDataList.setColor(color[luCeDataLists.size()-1]);
+                                        } else if (luCeDataLists.size()>6&&luCeDataLists.size()<13){
+                                            luCeDataList.setColor(color[luCeDataLists.size()-7]);
+                                        } else if (luCeDataLists.size()>12&&luCeDataLists.size()<19){
+                                            luCeDataList.setColor(color[luCeDataLists.size()-13]);
+                                        } else if (luCeDataLists.size()>18&&luCeDataLists.size()<25){
+                                            luCeDataList.setColor(color[luCeDataLists.size()-19]);
+                                        }else if (luCeDataLists.size()>24&&luCeDataLists.size()<31){
+                                            luCeDataList.setColor(color[luCeDataLists.size()-25]);
+                                        }else if (luCeDataLists.size()>30&&luCeDataLists.size()<37){
+                                            luCeDataList.setColor(color[luCeDataLists.size()-31]);
+                                        }
+                                    }
+                                    luCeDataList.getList().add(point);
+                                    luCeDataLists.add(luCeDataList);
+                            }
+                        }
+                        //对每个小区下的数据集合进行筛选   把距离小于20的数据删掉
+                        for (int i1=0;i1<luCeDataLists.size();i1++){
+                            List<Point> list=luCeDataLists.get(i1).getList();
+                            for (int i2=0;i2<list.size();i2++){
+                                final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(list.get(i2).getLat()),Double.valueOf(list.get(i2).getLon()));
+                                LatLng latLng_start=new LatLng(latlon1[0],latlon1[1]);
+                                final double[] latlon2= GPSUtils.wgs2bd(Double.valueOf(list.get(i2+1).getLat()),Double.valueOf(list.get(i2+1).getLon()));
+                                LatLng latLng_end=new LatLng(latlon2[0],latlon2[1]);
+                                double distance=getDistance(latLng_start,latLng_end);
+                                if (distance<20){
+                                    list.remove(i2);
+                                    i2--;
+                                }
+                            }
+                        }
+                    }
+                    if (count_sum==one_package){
+                        for (int t=0;t<luCeDataLists.size();t++){
+                            LuceCellInfo luceCellInfo=new LuceCellInfo();
+                            luceCellInfo.setLac_sid(Integer.valueOf(luCeDataLists.get(t).getLac_sid()));
+                            luceCellInfo.setCi_nid(Integer.valueOf(luCeDataLists.get(t).getCi_nid()));
+                            if (!(luCeDataLists.get(t).getBid()==null)){
+                                luceCellInfo.setBid(Integer.valueOf(luCeDataLists.get(t).getBid()));
+                            }
+                            luceCellInfo.setColor(luCeDataLists.get(t).getColor());
+                            luceCellInfos.add(luceCellInfo);
+                            showList_latLngs.add(luCeDataLists.get(t).getList());
+                            List<String> list_rssi=new ArrayList<>();
+                            for (int j=0;j<luCeDataLists.get(t).getList().size();j++){
+                                list_rssi.add(luCeDataLists.get(t).getList().get(j).getRssi());
+                            }
+                            showList_rssi.add(list_rssi);
+                        }
+                        Message message_msg=new Message();
+                        message_msg.arg1=1;
+                        handler1.sendMessage(message_msg);
+//                        workhandler.getLooper().quit();
+                        //把得到的所有数据转换成需要的数据格式
+                        for (int i=0;i<luCeDataLists.size();i++){
+                            LuCeDataList luCeDataList=luCeDataLists.get(i);
+                            List<Point> list=luCeDataLists.get(i).getList();
+//                            showList_latLngs.add(list);
+//                            List<String> list_rssi=new ArrayList<>();
+                            List<LatLng> latLngs=new ArrayList<>();
+//                            for (int j=0;j<list.size();j++){
+//                                list_rssi.add(list.get(j).getRssi());
+//                            }
+//                            showList_rssi.add(list_rssi);
+                            for (int q=0;q<list.size();q++){
+                                Point point= list.get(q);
+                                double lat=Double.valueOf(point.getLat());
+                                double lon=Double.valueOf(point.getLon());
+                                if ((int)lat==0&&(int)lon==0){
+                                    list.remove(point);
+                                    q--;
+                                }
+                            }
+                            ConvexHull convexHull=new ConvexHull(list);
+                            List<Point> list_po=convexHull.calculateHull();
+                            if (list_po.size()>=3){
+                                for (int w=0;w<list_po.size();w++){
+                                    Point point=list_po.get(w);
+                                    final double[] latlon= GPSUtils.wgs2bd(Double.valueOf(point.getLat()),Double.valueOf(point.getLon()));
+                                    LatLng latLng=new LatLng(latlon[0],latlon[1]);
+                                    latLngs.add(latLng);
+                                }
+                                if (showList.size()==0){
+                                    OverlayOptions polygonOption = new PolygonOptions()
+                                            .points(latLngs)
+                                            .stroke(new Stroke(5, 0xff00ffff))//color[showList.size()-1]
+                                            .fillColor(0);
+                                    showList.add(polygonOption);
+                                }else if (showList.size()==1||showList.size()>1){
+                                    OverlayOptions polygonOption=null;
+                                    if (showList.size()<7){
+                                        polygonOption = new PolygonOptions()
+                                                .points(latLngs)
+                                                .stroke(new Stroke(5, color[showList.size()-1]))//color[showList.size()-1]
+                                                .fillColor(0);//0x80ffffff
+                                    }else if (showList.size()>6&&showList.size()<13){
+                                        polygonOption = new PolygonOptions()
+                                                .points(latLngs)
+                                                .stroke(new Stroke(5, color[showList.size()-7]))//color[showList.size()-7]
+                                                .fillColor(0);
+                                    }else if (showList.size()>12&&showList.size()<19){
+                                        polygonOption = new PolygonOptions()
+                                                .points(latLngs)
+                                                .stroke(new Stroke(5, color[showList.size()-13]))//color[showList.size()-7]
+                                                .fillColor(0);
+                                    } else if (showList.size()>18&&showList.size()<25){
+                                        polygonOption = new PolygonOptions()
+                                                .points(latLngs)
+                                                .stroke(new Stroke(5, color[showList.size()-19]))//color[showList.size()-7]
+                                                .fillColor(0);
+                                    }else if (showList.size()>24&&showList.size()<31){
+                                        polygonOption = new PolygonOptions()
+                                                .points(latLngs)
+                                                .stroke(new Stroke(5, color[showList.size()-25]))//color[showList.size()-7]
+                                                .fillColor(0);
+                                    }else if (showList.size()>30&&showList.size()<37){
+                                        polygonOption = new PolygonOptions()
+                                                .points(latLngs)
+                                                .stroke(new Stroke(5, color[showList.size()-31]))//color[showList.size()-7]
+                                                .fillColor(0);
+                                    }
+                                    showList.add(polygonOption);
+                                }
+                            }else {
+
+                            }
+                            Point p=new Point();
+                            p.setP1(String.valueOf(luCeDataList.getLac_sid()));
+                            p.setP2(String.valueOf(luCeDataList.getCi_nid()));
+                            p.setP3(String.valueOf(luCeDataList.getBid()));
+                            list_neibor_latlon.add(p);
+                            for (int h=0;h<list_neibor_latlon.size();h++){
+                                if ((list.get(0).getP1().equals(list_neibor_latlon.get(h).getP1()))&&(list.get(0).getP2().equals(list_neibor_latlon.get(h).getP2()))){
+                                    Point point=list_neibor_latlon.get(h);
+                                    point.setLat(list.get(0).getLat());
+                                    point.setLon(list.get(0).getLon());
+                                }
+                            }
+                        }
+                    }
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+                Log.e("ee","");
+            }
+        }
+    }
+    Handler handler1=new Handler(){
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if (msg.arg1==1){
+                lacDataAdapter.notifyDataSetChanged();
+                AlertDialog.Builder builder=new AlertDialog.Builder(context)
+                        .setTitle("提示")
+                        .setMessage("区域查询数据已全部加载完毕！")
+                        .setPositiveButton("确定",null);
+                builder.show();
+            }
+        }
+    };
+    /**
+     * 计算两点之间距离
+     * @param start
+     * @param end
+     * @return 米
+     */
+    public double getDistance(LatLng start,LatLng end){
+        double lat1 = (Math.PI/180)*start.latitude;
+        double lat2 = (Math.PI/180)*end.latitude;
+
+        double lon1 = (Math.PI/180)*start.longitude;
+        double lon2 = (Math.PI/180)*end.longitude;
+
+        //地球半径
+        double R = 6371;
+
+        //两点间距离 km，如果想要米的话，结果*1000
+        double d =  Math.acos(Math.sin(lat1)*Math.sin(lat2)+Math.cos(lat1)*Math.cos(lat2)*Math.cos(lon2-lon1))*R;
+        if(d<1)
+            return (int)d*1000;//return (int)d*1000+"m";
+        else
+            return Double.parseDouble(String.format("%.2f",d))*1000;// return String.format("%.2f",d)+"km";
+    }
+
     public boolean find(){
         boolean flag=false;
         for (int n=0;n<luceCellInfos.size();n++){
@@ -349,6 +856,45 @@ public class MainActivity extends AppCompatActivity {
         //添加事件Spinner事件监听
         mncSpinner.setOnItemSelectedListener(dModeSelectLis);
     }
+    private void initZhiShiSpinner(){
+        modeSpinner=findViewById(R.id.set_mode);
+        zhishiAdapter=new ArrayAdapter(context,android.R.layout.simple_spinner_item,zhishis);
+        zhishiAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        //将adapter 添加到spinner中
+        modeSpinner.setAdapter(zhishiAdapter);
+        modeSpinner.setSelection(0,true);
+        //添加事件Spinner事件监听
+        modeSpinner.setOnItemSelectedListener(dZhiShiSelectLis);
+    }
+    private AdapterView.OnItemSelectedListener dZhiShiSelectLis = new AdapterView.OnItemSelectedListener()
+    {//zhishis={"GSM","LTE","WCDMA","CDMA","TD-SCDMA","WIFI"};
+        @Override
+        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+            switch (position){
+                case 0:
+                    zhishi_mode="GSM";
+                    break;
+                case 1:
+                    zhishi_mode="LTE";
+                    break;
+                case 2:
+                    zhishi_mode="WCDMA";
+                    break;
+                case 3:
+                    zhishi_mode="CDMA";
+                    break;
+                case 4:
+                    zhishi_mode="TD-SCDMA";
+                    break;
+                case 5:
+                    zhishi_mode="WIFI";
+                    break;
+
+            }
+        }
+        @Override
+        public void onNothingSelected(AdapterView<?> parent) {}
+    };
     private AdapterView.OnItemSelectedListener dModeSelectLis = new AdapterView.OnItemSelectedListener()
     {
         @Override
@@ -588,7 +1134,7 @@ public class MainActivity extends AppCompatActivity {
         Log.v("bid1", bid);
         return start_flg;
     }
-    public byte[] read(File fileName){
+    public String read(File fileName){
         FileInputStream is = null;
         ByteArrayOutputStream bos=null;
         try {
@@ -604,7 +1150,7 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return bos.toByteArray();
+        return bos.toString();
     }
     public void writeMsgToFile(String msg) {
         String filePath = Environment.getExternalStorageDirectory().getPath()+ File.separator+"LuCeIp.txt";
@@ -653,8 +1199,6 @@ public class MainActivity extends AppCompatActivity {
                 luceCellInfo.setColor(color[showList.size()-7]);
             }
         }
-        Looper looper = Looper.getMainLooper(); //主线程的Looper对象
-        handler = new MyHandler(looper);
 
         Map<String, String> params = new HashMap<>();
         params.put("mcc", mcc );
@@ -672,23 +1216,21 @@ public class MainActivity extends AppCompatActivity {
         RequestBody requestBody =  builder1.build();
         Request.Builder builder = new Request.Builder();
 //        builder.url(InterfaceUrl.BASEURL);
-        builder.url("http://"+ip+"/collect/DataDLServlet");
+        String URL=interfaceUrl.getBASEURL();
+        builder.url(URL);
         builder.post(requestBody);
         Call call  = okHttpClient.newCall(builder.build());
         call.enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
 //                Log.e("OKHttp","11111");
-                Message msg = handler .obtainMessage(1,0,4,null);
+                Message msg = handler .obtainMessage(0,0,4,null);
                 handler .sendMessage(msg);
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 try {
-                    JSONArray array=new JSONArray();
-                    List<String> list_rssi=new ArrayList<>();
-                    List<LatLng> latLngs=new ArrayList<>();
                     if(response.isSuccessful()){
                         InputStream is = response.body().byteStream();
                         int datalength = 0;
@@ -712,7 +1254,7 @@ public class MainActivity extends AppCompatActivity {
                             }
 
                             if (!headread && msgBuffer.length >= 4) {
-                                byte[] alllength = ArrayUtils.subArray(bArr, 0, 4);
+                                byte[] alllength = ArrayUtils.subArray(msgBuffer, 0, 4);
                                 datalength = (alllength[3] & 0xff) * 256 * 256 * 256
                                         + (alllength[2] & 0xff) * 256 * 256
                                         + (alllength[1] & 0xff) * 256
@@ -724,7 +1266,7 @@ public class MainActivity extends AppCompatActivity {
                             if (headread) {
                                 //头长度已读
                                 if (msgBuffer.length >= 4 && sublen < 0) {
-                                    byte[] sublength = ArrayUtils.subArray(bArr, 0, 4);
+                                    byte[] sublength = ArrayUtils.subArray(msgBuffer, 0, 4);
                                     sublen = (sublength[3] & 0xff) * 256 * 256 * 256
                                             + (sublength[2] & 0xff) * 256 * 256
                                             + (sublength[1] & 0xff) * 256
@@ -740,8 +1282,11 @@ public class MainActivity extends AppCompatActivity {
                                     //数据处理
                                     String json=new String(subdata);
                                     JSONObject object=new JSONObject(json);
+                                    JSONArray array=object.getJSONArray("datalist");
+                                    int count=array.length();
 
-                                    Message msg = handler .obtainMessage(datalength,i,1,object);
+
+                                    Message msg = handler .obtainMessage(0,i,1,object);
                                     handler .sendMessage(msg);
                                 }
                             }
@@ -804,13 +1349,9 @@ public class MainActivity extends AppCompatActivity {
     }
     private LatLng end_latLng=null;
     private int[] color={0xffff0000,0xff00ff00,0xff0000ff,0xffffff00,0xff00ffff,0xffff00ff};
-    class MyHandler extends Handler{
-
-        public MyHandler(Looper looper){
-            super(looper);
-        }
-
-        public void handleMessage(Message msg){
+    Handler handler=new Handler(){
+        @Override
+        public void handleMessage(Message msg) {
             super.handleMessage(msg);
             if (msg.arg2==4){
                 Toast.makeText(context,"服务器连接失败，请稍后再试",Toast.LENGTH_SHORT).show();
@@ -880,6 +1421,8 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                     Log.e("rssi",max_rssi+"   "+min_rssi+"");
+                    showList_latLngs.add(list);
+                    showList_rssi.add(list_rssi);
                     for (int i=0;i<list.size();i++){
                         int rssi_rgb=(Integer.valueOf(list.get(i).getRssi())-min_rssi)*100/(max_rssi-min_rssi);
                         final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(list.get(i).getLat()),Double.valueOf(list.get(i).getLon()));
@@ -923,7 +1466,7 @@ public class MainActivity extends AppCompatActivity {
                                         .fillColor(0);
                             }
                             showList.add(polygonOption);
-                            overlays.add(mBaiduMap.addOverlay(polygonOption));
+                            mBaiduMap.addOverlay(polygonOption);
                             baiduMapUtil.add_more_overlay(showList);
                         }
                     }
@@ -947,6 +1490,22 @@ public class MainActivity extends AppCompatActivity {
                 lacDataAdapter.notifyDataSetChanged();
                 luceCellInfo=new LuceCellInfo();
             }
+        }
+    };
+    public void myPermission() {
+        final int REQUEST_EXTERNAL_STORAGE = 1;
+        String[] PERMISSIONS_STORAGE = {
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+        };
+        int permission = ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        if (permission != PackageManager.PERMISSION_GRANTED) {
+            // We don't have permission so prompt the user
+            ActivityCompat.requestPermissions(
+                    this,
+                    PERMISSIONS_STORAGE,
+                    REQUEST_EXTERNAL_STORAGE
+            );
         }
     }
     protected void onDestroy() {

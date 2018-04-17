@@ -71,25 +71,6 @@ public class OkHttpManager {
         doRequest(request, callBack);
     }
 
-    /**
-     *
-     * @param mcc
-     * @param mnc
-     * @param lac_sid
-     * @param cellid_nid
-     * @param bid
-     * @param callBack
-     */
-    public static void getSingleLuce(String mcc,String mnc,String lac_sid,String cellid_nid,String bid,BaseCallBack callBack) {
-        Map<String, String> params = new HashMap<>();
-        params.put("mcc", mcc );
-        params.put("mnc", mnc );
-        params.put("p1", lac_sid );
-        params.put("p2", cellid_nid );
-        params.put("p3", bid );
-        postRequest(InterfaceUrl.BASEURL,callBack,params);
-    }
-
 
 
     public static void postUploadSingleImage(String url, final BaseCallBack callback, File file, String fileKey, Map<String, String> params) {

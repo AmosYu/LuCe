@@ -5,19 +5,19 @@
     >
     <TextView
         android:id="@+id/dilog_cell_lac"
-        android:layout_width="60dp"
+        android:layout_width="90dp"
         android:layout_height="match_parent"
         android:textSize="@dimen/size_18sp"
         android:gravity="center"/>
     <TextView
         android:id="@+id/dilog_cell_ci"
-        android:layout_width="60dp"
+        android:layout_width="90dp"
         android:layout_height="match_parent"
         android:textSize="@dimen/size_18sp"
         android:gravity="center"/>
     <TextView
         android:id="@+id/dilog_cell_bid"
-        android:layout_width="60dp"
+        android:layout_width="90dp"
         android:layout_height="match_parent"
         android:textSize="@dimen/size_18sp"
         android:gravity="center"/>

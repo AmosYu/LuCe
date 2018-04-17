@@ -19,7 +19,7 @@
             <LinearLayout
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_weight="2"
+                android:layout_weight="1.5"
                 android:layout_height="match_parent">
 
                 <Spinner
@@ -28,6 +28,12 @@
                     android:layout_weight="1"
                     android:layout_height="match_parent"
                     ></Spinner>
+                <Spinner
+                    android:id="@+id/set_mode"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="match_parent"
+                    />
             </LinearLayout>
             <LinearLayout
                 android:orientation="horizontal"
@@ -247,21 +253,21 @@
                 android:layout_height="30dp"
                 android:orientation="horizontal" >
                 <TextView
-                    android:layout_width="70dp"
+                    android:layout_width="90dp"
                     android:layout_height="match_parent"
                     android:text="LAC_SID"
                     android:textSize="@dimen/text_size_16"
                     android:gravity="center"
                     android:textColor="@color/black"/>
                 <TextView
-                    android:layout_width="60dp"
+                    android:layout_width="90dp"
                     android:layout_height="match_parent"
                     android:text="CI_NID"
                     android:textSize="@dimen/text_size_16"
                     android:gravity="center"
                     android:textColor="@color/black"/>
                 <TextView
-                    android:layout_width="60dp"
+                    android:layout_width="90dp"
                     android:layout_height="match_parent"
                     android:text="BID"
                     android:textSize="@dimen/text_size_16"
@@ -270,7 +276,7 @@
             </LinearLayout>
             <ListView
                 android:id="@+id/neibor_list"
-                android:layout_width="180dp"
+                android:layout_width="270dp"
                 android:layout_height="wrap_content"
                 android:layout_alignParentLeft="true"
                 android:layout_alignParentTop="true"
