@@ -29,8 +29,9 @@ public class LacDataAdapter extends CommonAdapter<LuceCellInfo> {
         ViewHolder holder = ViewHolder.get(mContext, convertView, parent, R.layout.cell_listview_item, position);
         LuceCellInfo cellInfo = datas.get(position);
         ((TextView)holder.getView(R.id.dilog_cell_lac)).setText(String.valueOf(cellInfo.getLac_sid()));
-        ((TextView)holder.getView(R.id.dilog_cell_ci)).setText( String.valueOf(cellInfo.getCi_nid()));
-        ((TextView)holder.getView(R.id.dilog_cell_bid)).setText( String.valueOf(cellInfo.getBid()));
+        ((TextView)holder.getView(R.id.dilog_cell_ci)).setText(" , "+String.valueOf(cellInfo.getCi_nid()));
+        ((TextView)holder.getView(R.id.dilog_cell_bid)).setText(" , "+String.valueOf(cellInfo.getBid()));
+        ((TextView)holder.getView(R.id.number)).setText(" , "+String.valueOf(cellInfo.getSize()));
         ((TextView)holder.getView(R.id.dilog_cell_lac)).setTextColor(datas.get(position).getColor());
         ((TextView)holder.getView(R.id.dilog_cell_ci)).setTextColor(datas.get(position).getColor());
         ((TextView)holder.getView(R.id.dilog_cell_bid)).setTextColor(datas.get(position).getColor());
@@ -57,6 +58,7 @@ public class LacDataAdapter extends CommonAdapter<LuceCellInfo> {
 
         holder.setText(R.id.dilog_cell_lac, String.valueOf(cellInfo.getLac_sid()))
                 .setText(R.id.dilog_cell_ci, String.valueOf(cellInfo.getCi_nid()))
-                .setText(R.id.dilog_cell_bid, String.valueOf(cellInfo.getBid()));
+                .setText(R.id.dilog_cell_bid, String.valueOf(cellInfo.getBid()))
+                .setText(R.id.number, "");
     }
 }

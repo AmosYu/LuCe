@@ -29,6 +29,7 @@ public class LuceCellInfo implements Serializable {
      * 数据采集时间
      */
     private String time;
+    private int size=0;
 
     /**
      * cdma中表示pn gsm中表示bsic LTE中表示PCI WCDMA和TD中表示 PSC
@@ -78,6 +79,14 @@ public class LuceCellInfo implements Serializable {
     public String band = "";
 
     private int color=0;
+
+    public int getSize() {
+        return size;
+    }
+
+    public void setSize(int size) {
+        this.size = size;
+    }
 
     public int getColor() {
         return color;

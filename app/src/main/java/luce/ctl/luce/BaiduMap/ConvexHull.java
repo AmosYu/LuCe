@@ -5,6 +5,9 @@
  */
 package luce.ctl.luce.BaiduMap;
 
+import android.util.Log;
+
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -52,8 +55,7 @@ public class ConvexHull {
         return firstIndex;
     }
 
-    public ConvexHull(List<Point> l) {
-
+    public ConvexHull(List<Point> l){
         hullPointList = new LinkedList<Point>();
         indexList = new LinkedList<Integer>();
         Point[] array = new Point[l.size()];
@@ -65,27 +67,18 @@ public class ConvexHull {
     public int getFirstPoint() {
         int minIndex = 0;
         for (int i = 1; i < ps.length; i++) {
-            if (Double.valueOf(ps[i].getLat()) < Double.valueOf(ps[minIndex].getLat())) {
+            if (new BigDecimal(ps[i].getLat()).compareTo(new BigDecimal(ps[minIndex].getLat()))==-1) {
+//            Double.valueOf(ps[i].getLat()) < Double.valueOf(ps[minIndex].getLat())
                 minIndex = i;
-            } else if ((Double.valueOf(ps[i].getLat())== Double.valueOf(ps[minIndex].getLat()))
-                    && (Double.valueOf(ps[i].getLon())< Double.valueOf(ps[minIndex].getLon()))) {
+            } else if ((new BigDecimal(ps[i].getLat()).compareTo(new BigDecimal(ps[minIndex].getLat()))==0)
+                    && (new BigDecimal(ps[i].getLon()).compareTo(new BigDecimal(ps[minIndex].getLon()))==-1)) {
+               //(Double.valueOf(ps[i].getLat())== Double.valueOf(ps[minIndex].getLat())) && (Double.valueOf(ps[i].getLon())< Double.valueOf(ps[minIndex].getLon()))
                 minIndex = i;
             }
         }
         return minIndex;
     }
-//    public int getFirstPoint() {
-//        int minIndex = 0;
-//        for (int i = 1; i < ps.length; i++) {
-//            if (Double.valueOf(ps[i].getLat()) < Double.valueOf(ps[minIndex].getLat())) {
-//                minIndex = i;
-//            } else if ((Double.valueOf(ps[i].getLat())== Double.valueOf(ps[minIndex].getLat()))
-//                    && (Double.valueOf(ps[i].getLon())< Double.valueOf(ps[minIndex].getLon()))) {
-//                minIndex = i;
-//            }
-//        }
-//        return minIndex;
-//    }
+
 
     private void initialize() {
     }
@@ -132,8 +125,8 @@ public class ConvexHull {
         for (int i = 0; i < ps.length; i++) {
             if (i != currentIndex) {
                 try{
-                    pseudoAngle = getPseudoAngle(Double.valueOf(ps[i].getLon()) - Double.valueOf(ps[currentIndex].getLon()),
-                            Double.valueOf(ps[i].getLat()) - Double.valueOf(ps[currentIndex].getLat()));
+                    pseudoAngle = getPseudoAngle(new BigDecimal(ps[i].getLon()).subtract(new BigDecimal(ps[currentIndex].getLon())).doubleValue(),
+                            new BigDecimal(ps[i].getLat()).subtract(new BigDecimal(ps[currentIndex].getLat())).doubleValue());
                 }catch (Exception e){
                     e.printStackTrace();
                     continue;
@@ -142,12 +135,12 @@ public class ConvexHull {
                     minAngle = pseudoAngle;
                     minIndex = i;
                 } else if (pseudoAngle == minAngle){
-                        if((abs(Double.valueOf(ps[i].getLon()) - Double.valueOf(ps[currentIndex].getLon())) >
-                            abs(Double.valueOf(ps[minIndex].getLon()) - Double.valueOf(ps[currentIndex].getLon())))
-                            || (abs(Double.valueOf(ps[i].getLat()) - Double.valueOf(ps[currentIndex].getLat())) >
-                            abs(Double.valueOf(ps[minIndex].getLat()) - Double.valueOf(ps[currentIndex].getLat())))){
-                            minIndex = i;
-                        }
+                            if (abs(new BigDecimal(ps[i].getLon()).subtract(new BigDecimal(ps[currentIndex].getLon())).doubleValue())>
+                                    abs(new BigDecimal(ps[minIndex].getLon()).subtract(new BigDecimal(ps[currentIndex].getLon())).doubleValue())||
+                                    abs(new BigDecimal(ps[i].getLat()).subtract(new BigDecimal(ps[currentIndex].getLat())).doubleValue())>
+                                            abs(new BigDecimal(ps[minIndex].getLat()).subtract(new BigDecimal(ps[currentIndex].getLat())).doubleValue())){
+                                minIndex = i;
+                            }
                 }
             }
 
@@ -167,9 +160,5 @@ public class ConvexHull {
             return 3 + (dx / (dx + abs(dy)));
         throw new RuntimeException("Impossible");
     }
-// public static void main(String[] args) {
-//     ConvexHull ch = new ConvexHull(l);
-//        List<SH0001OutputBean> calculateHull = ch.calculateHull();
-// }
 
 }

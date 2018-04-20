@@ -141,14 +141,14 @@
                     />
             </LinearLayout>
             <LinearLayout
-                android:id="@+id/bid_liner"
+                android:id="@+id/nid_liner"
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
                 android:layout_weight="2"
                 android:layout_height="match_parent"
                 android:visibility="gone">
                 <TextView
-                    android:text="BID:"
+                    android:text="NID:"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:textSize="@dimen/size_15sp"
@@ -253,30 +253,41 @@
                 android:layout_height="30dp"
                 android:orientation="horizontal" >
                 <TextView
-                    android:layout_width="90dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:text="LAC_SID"
                     android:textSize="@dimen/text_size_16"
                     android:gravity="center"
                     android:textColor="@color/black"/>
                 <TextView
-                    android:layout_width="90dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:text="CI_NID"
                     android:textSize="@dimen/text_size_16"
+                    android:layout_marginLeft="8dp"
                     android:gravity="center"
                     android:textColor="@color/black"/>
                 <TextView
-                    android:layout_width="90dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:text="BID"
                     android:textSize="@dimen/text_size_16"
+                    android:layout_marginLeft="8dp"
                     android:gravity="center"
+                    android:textColor="@color/black"/>
+                <TextView
+                    android:id="@+id/txt_list_shou"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:text="收起"
+                    android:textSize="@dimen/text_size_16"
+                    android:gravity="center_vertical"
+                    android:layout_marginLeft="8dp"
                     android:textColor="@color/black"/>
             </LinearLayout>
             <ListView
                 android:id="@+id/neibor_list"
-                android:layout_width="270dp"
+                android:layout_width="185dp"
                 android:layout_height="wrap_content"
                 android:layout_alignParentLeft="true"
                 android:layout_alignParentTop="true"

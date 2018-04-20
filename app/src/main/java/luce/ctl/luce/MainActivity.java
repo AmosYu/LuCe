@@ -36,6 +36,7 @@ import com.baidu.mapapi.SDKInitializer;
 import com.baidu.mapapi.map.BaiduMap;
 import com.baidu.mapapi.map.BitmapDescriptor;
 import com.baidu.mapapi.map.BitmapDescriptorFactory;
+import com.baidu.mapapi.map.CircleOptions;
 import com.baidu.mapapi.map.InfoWindow;
 import com.baidu.mapapi.map.MapPoi;
 import com.baidu.mapapi.map.MapStatus;
@@ -48,6 +49,7 @@ import com.baidu.mapapi.map.OverlayOptions;
 import com.baidu.mapapi.map.PolygonOptions;
 import com.baidu.mapapi.map.Stroke;
 import com.baidu.mapapi.model.LatLng;
+import com.baidu.mapapi.utils.DistanceUtil;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -75,9 +77,11 @@ import luce.ctl.luce.ui.LuceCellInfo;
 import luce.ctl.luce.utils.AlrDialog_Show;
 import luce.ctl.luce.utils.ArrayUtils;
 import luce.ctl.luce.utils.GPSUtils;
+import luce.ctl.luce.utils.Gps2BaiDu;
 import luce.ctl.luce.utils.NumCheck;
 import luce.ctl.luce.utils.Point;
 import luce.ctl.luce.utils.TimerProgressDialog;
+import luce.ctl.luce.utils.TipHelper;
 import luce.ctl.luce.utils.dataCode;
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -94,7 +98,7 @@ public class MainActivity extends AppCompatActivity {
 
     private Spinner mncSpinner;
     private Spinner modeSpinner;
-    private String[] modes={"中国移动","中国联通","中国电信2G","中国电信4G"};
+    private String[] modes={"中国移动","中国联通","中国电信"};
     private String zhishi_mode="GSM";
     private String[] zhishis={"GSM","LTE","WCDMA","CDMA","TD-SCDMA","WIFI"};
     private ArrayAdapter mncAdapter;
@@ -102,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView lac_text;
     private TextView cell_text;
-    private LinearLayout bid_liner;
+    private LinearLayout nid_liner;
     private EditText lac_edit;
     private EditText cell_edit;
     private EditText bid_edit;
@@ -138,9 +142,18 @@ public class MainActivity extends AppCompatActivity {
     private List<List<String>> showList_rssi=new ArrayList<>();
     private int marker=0;
     private List<LatLng> marker_latlng=new ArrayList<>();//对地图上的两个标记点进行保存
+    private List<LatLng> marker_latlng_data=new ArrayList<>();//对地图上的两个查询的数据
+    private List<List<LatLng>> latlngs=new ArrayList<>();//用于存放展示图层的数据
     private Workhandler workhandler;
     private InterfaceUrl interfaceUrl;
     private List<LuCeDataList> luCeDataLists=new ArrayList<>();//用来存放区域查询得到的数据
+    private boolean area=false;
+    private OverlayOptions options=null;//区域显示的图层
+    private TextView txt_list_shou;
+    private TimerProgressDialog timerProgressDialog;
+    private TimerProgressDialog timerProgressDialog1;
+    private TimerProgressDialog timerDialog;
+    private int first=0;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -158,11 +171,12 @@ public class MainActivity extends AppCompatActivity {
     private void initView() {
         myPermission();
         mMapView=(MapView) findViewById(R.id.bmapView);
+        txt_list_shou=findViewById(R.id.txt_list_shou);
         initModeSpinner();
         initZhiShiSpinner();
         lac_text=(TextView)findViewById(R.id.lac_text_id);
         cell_text=(TextView)findViewById(R.id.cell_text_id);
-        bid_liner=(LinearLayout)findViewById(R.id.bid_liner);
+       nid_liner=(LinearLayout)findViewById(R.id.nid_liner);
         hex_mode = (CheckBox)findViewById(R.id.Hex);
         lac_edit = (EditText)findViewById(R.id.lac_str);
         cell_edit = (EditText)findViewById(R.id.cellid_str);
@@ -212,22 +226,72 @@ public class MainActivity extends AppCompatActivity {
                             .position(latLng)
                             .icon(bitmap);
                     mBaiduMap.addOverlay(option);
+                    TipHelper.Vibrate(MainActivity.this,200);//点击震动
                     marker++;
+                    LatLng latLng1=new LatLng(latLng.latitude-0.01,latLng.longitude-0.01);
+                    LatLng latLng2=new LatLng(latLng.latitude+0.01,latLng.longitude+0.01);
+                    marker_latlng_data.add(latLng1);
+                    marker_latlng_data.add(latLng2);
                     marker_latlng.add(latLng);
+
+                    options=null;
+                    List<LatLng> latLngs=new ArrayList<>();
+                    LatLng l1=marker_latlng_data.get(0);//(x1,y1)
+                    LatLng l3=marker_latlng_data.get(1);//(x2,y2)
+                    LatLng l2=new LatLng(l1.latitude,l3.longitude);
+                    LatLng l4=new LatLng(l3.latitude,l1.longitude);
+                    latLngs.add(l1);
+                    latLngs.add(l2);
+                    latLngs.add(l3);
+                    latLngs.add(l4);
+                    options = new PolygonOptions()
+                            .points(latLngs)
+                            .stroke(new Stroke(5, Color.GRAY))//color[showList.size()-1]
+                            .fillColor(0);
+                    mBaiduMap.addOverlay(options);
                 }else if (marker==1){
+                    mBaiduMap.clear();
+                    options=null;
+                    marker_latlng_data.clear();
                     bitmap = BitmapDescriptorFactory
-                            .fromResource(R.drawable.icon_markb);
+                            .fromResource(R.drawable.icon_marka);
                     OverlayOptions option = new MarkerOptions()
-                            .position(latLng)
+                            .position(marker_latlng.get(0))
                             .icon(bitmap);
                     mBaiduMap.addOverlay(option);
+                    bitmap = BitmapDescriptorFactory
+                            .fromResource(R.drawable.icon_markb);
+                    OverlayOptions option1 = new MarkerOptions()
+                            .position(latLng)
+                            .icon(bitmap);
+                    mBaiduMap.addOverlay(option1);
+                    TipHelper.Vibrate(MainActivity.this,200);
                     marker++;
                     marker_latlng.add(latLng);
+                    for (int i=0;i<marker_latlng.size();i++){
+                        marker_latlng_data.add(marker_latlng.get(i));
+                    }
+
+                    List<LatLng> latLngs=new ArrayList<>();
+                    LatLng l1=marker_latlng.get(0);//(x1,y1)
+                    LatLng l3=marker_latlng.get(1);//(x2,y2)
+                    LatLng l2=new LatLng(l1.latitude,l3.longitude);
+                    LatLng l4=new LatLng(l3.latitude,l1.longitude);
+                    latLngs.add(l1);
+                    latLngs.add(l2);
+                    latLngs.add(l3);
+                    latLngs.add(l4);
+                    options = new PolygonOptions()
+                            .points(latLngs)
+                            .stroke(new Stroke(5, Color.GRAY))//color[showList.size()-1]
+                            .fillColor(0);
+                    mBaiduMap.addOverlay(options);
                 }else if (marker>1){
                     AlertDialog.Builder builder=new AlertDialog.Builder(context)
                             .setTitle("提示")
                             .setMessage("最多只能添加两个标注点")
                             .setPositiveButton("确定",null);
+                    builder.setCancelable(false);//不可以用返回键取消
                     builder.show();
                 }
             }
@@ -235,6 +299,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void bindEvent() {
+        txt_list_shou.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String txt=txt_list_shou.getText().toString();
+                if (txt.equals("收起")){
+                    listView.setVisibility(View.GONE);
+                    txt_list_shou.setText("弹出");
+                }else if (txt.equals("弹出")){
+                    listView.setVisibility(View.VISIBLE);
+                    txt_list_shou.setText("收起");
+                }
+            }
+        });
         hex_mode.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -266,6 +343,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 if(!(ip.equals("")||ip=="")){
                    interfaceUrl=new InterfaceUrl(ip);
+                   timerDialog=null;
                     if(start_flg==true)
                     {
                         if (find()){
@@ -275,12 +353,14 @@ public class MainActivity extends AppCompatActivity {
                                     .setPositiveButton("确定",null);
                             builder.show();
                         }else {
+                            area=false;
+                            options=null;
                             new Thread(new Runnable() {
                                 public void run() {
                                     Request_Gps();
                                 }
                             }).start();
-                            TimerProgressDialog timerDialog = new TimerProgressDialog(context,10000,"开始读取数据","正在读取数据请稍等");
+                            timerDialog = new TimerProgressDialog(context,10000,"开始读取数据","正在读取数据请稍等");
                             timerDialog.show();
                         }
                     }
@@ -306,11 +386,20 @@ public class MainActivity extends AppCompatActivity {
                     sid="";
                     nid="";
                     bid="";
+                    area=false;
+                    options=null;
+                    first=0;
+                    timerProgressDialog=null;
+                    timerProgressDialog1=null;
+                    timerDialog=null;
                     marker_latlng.clear();
+                    marker_latlng_data.clear();
                     list_curent_overlayoptions.clear();
                     list_neibor_latlon.clear();
                     showList_latLngs.clear();
                     showList_rssi.clear();
+                    latlngs.clear();
+                    luCeDataLists.clear();
                     luceCellInfos.clear();
                     lacDataAdapter.notifyDataSetChanged();
                 }
@@ -340,6 +429,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
                 builder.setNegativeButton("取消",null);
+                builder.setCancelable(false);//不可以用返回键取消
                 builder.show();
             }
         });
@@ -353,7 +443,19 @@ public class MainActivity extends AppCompatActivity {
                         .setPositiveButton("覆盖", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialogInterface, int i) {
-                                OverlayOptions options=showList.get(current_position);
+                                OverlayOptions options = null;
+                                if (area){
+                                    List<LatLng> lngs=latlngs.get(current_position);
+                                    int color1=luceCellInfos.get(current_position).getColor();
+                                    if (lngs.size()>=3){
+                                        options = new PolygonOptions()
+                                                .points(lngs)
+                                                .stroke(new Stroke(5, color1))//color[showList.size()-1]
+                                                .fillColor(0);
+                                    }
+                                }else {
+                                    options=showList.get(current_position);
+                                }
                                 for (int m=0;m<list_curent_overlayoptions.size();m++){
                                     if (list_curent_overlayoptions.get(m)==options){//说明地图上现在有该图层
                                         final double[] latlon= GPSUtils.wgs2bd(Double.valueOf(list_neibor_latlon.get(current_position).getLat()),Double.valueOf(list_neibor_latlon.get(current_position).getLon()));
@@ -361,7 +463,7 @@ public class MainActivity extends AppCompatActivity {
                                         //定义地图状态
                                         MapStatus mMapStatus = new MapStatus.Builder()
                                                 .target(cenpt)
-                                                .zoom(15)
+                                                .zoom(18)
                                                 .build();
                                         //定义MapStatusUpdate对象，以便描述地图状态将要发生的变化
 
@@ -382,15 +484,29 @@ public class MainActivity extends AppCompatActivity {
                                             }
                                         }
                                         for (int b=0;b<current_list.size();b++){
-                                            int rssi_rgb=(Integer.valueOf(current_list.get(b).getRssi())-min_rssi)*100/(max_rssi-min_rssi);
+                                            int rssi_rgb;
+                                            if (Integer.valueOf(current_list.get(b).getRssi())-min_rssi==0||max_rssi-min_rssi==0){
+                                                rssi_rgb=0;
+                                            }else {
+                                                rssi_rgb=(Integer.valueOf(current_list.get(b).getRssi())-min_rssi)*100/(max_rssi-min_rssi);
+                                            }
                                             final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(current_list.get(b).getLat()),Double.valueOf(current_list.get(b).getLon()));
                                             if (!((int)latlon1[0]==0&&(int)latlon1[1]==0)){
-                                                baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+parameters[0]+","+parameters[1]+","+parameters[2]+"\n"
+                                                baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+current_list.get(b).getP1()+","+current_list.get(b).getP2()+","+current_list.get(b).getP3()+"\n"
                                                         +Double.valueOf(current_list.get(b).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
                                             }
                                         }
-                                        mBaiduMap.addOverlay(showList.get(current_position));
-                                        list_curent_overlayoptions.add(showList.get(current_position));
+                                        if (current_list.size()>3){
+                                            if (options!=null){
+                                                if (area){
+                                                    mBaiduMap.addOverlay(options);
+                                                    list_curent_overlayoptions.add(options);
+                                                }else {
+                                                    mBaiduMap.addOverlay(showList.get(current_position));
+                                                    list_curent_overlayoptions.add(showList.get(current_position));
+                                                }
+                                            }
+                                        }
                                         break;
                                     }
                                 }
@@ -401,30 +517,64 @@ public class MainActivity extends AppCompatActivity {
                             public void onClick(DialogInterface dialogInterface, int position) {
                                 mBaiduMap.clear();
                                 list_curent_overlayoptions.clear();
-                                List<Point> current_list=showList_latLngs.get(current_position);
-                                int max_rssi=Integer.valueOf(showList_rssi.get(current_position).get(0));
-                                int min_rssi=Integer.valueOf(showList_rssi.get(current_position).get(0));
-                                for (int i=0;i<showList_rssi.get(current_position).size()-1;i++){
-                                    int current=Integer.valueOf(showList_rssi.get(current_position).get(i));
-                                    if (current>max_rssi){
-                                        max_rssi=current;
-                                    } else if (current<min_rssi){
-                                        min_rssi=current;
-                                    }
-                                }
-                                for (int i=0;i<current_list.size();i++){
-                                    int rssi_rgb=(Integer.valueOf(current_list.get(i).getRssi())-min_rssi)*100/(max_rssi-min_rssi);
-                                    final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(current_list.get(i).getLat()),Double.valueOf(current_list.get(i).getLon()));
-                                    if (!((int)latlon1[0]==0&&(int)latlon1[1]==0)){
-                                        baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+parameters[0]+","+parameters[1]+","+parameters[2]+"\n"
-                                                +Double.valueOf(current_list.get(i).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
-                                    }
-                                }
-                                OverlayOptions options=showList.get(current_position);
                                 mBaiduMap.addOverlay(options);
-                                list_curent_overlayoptions.add(options);
+                                try{
+                                    OverlayOptions options1=null;
+                                    if (area){
+                                        List<LatLng> lats=latlngs.get(current_position);
+                                        int color=luceCellInfos.get(current_position).getColor();
+                                        if (lats.size()>=3){
+                                            options1 = new PolygonOptions()
+                                                    .points(lats)
+                                                    .stroke(new Stroke(5, color))//color[showList.size()-1]
+                                                    .fillColor(0);
+                                        }
+                                    }else {
+                                        options1=showList.get(current_position);
+                                    }
+                                    List<Point> current_list=showList_latLngs.get(current_position);
+                                    int max_rssi=Integer.valueOf(showList_rssi.get(current_position).get(0));
+                                    int min_rssi=Integer.valueOf(showList_rssi.get(current_position).get(0));
+                                    for (int i=0;i<showList_rssi.get(current_position).size()-1;i++){
+                                        int current=Integer.valueOf(showList_rssi.get(current_position).get(i));
+                                        if (current>max_rssi){
+                                            max_rssi=current;
+                                        } else if (current<min_rssi){
+                                            min_rssi=current;
+                                        }
+                                    }
+                                    for (int i=0;i<current_list.size();i++){
+                                        int rssi_rgb;
+                                        if (Integer.valueOf(current_list.get(i).getRssi())-min_rssi==0||max_rssi-min_rssi==0){
+                                            rssi_rgb=0;
+                                        }else {
+                                            rssi_rgb=(Integer.valueOf(current_list.get(i).getRssi())-min_rssi)*100/(max_rssi-min_rssi);
+                                        }
+                                        final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(current_list.get(i).getLat()),Double.valueOf(current_list.get(i).getLon()));
+                                        if (!((int)latlon1[0]==0&&(int)latlon1[1]==0)){
+                                            baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+current_list.get(i).getP1()+","+current_list.get(i).getP2()+","+current_list.get(i).getP3()+"\n"
+                                                    +Double.valueOf(current_list.get(i).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                                        }
+                                    }
+                                    if (current_list.size()>3){
+                                        if (options1!=null){
+                                            if (area){
+                                                mBaiduMap.addOverlay(options1);
+                                                list_curent_overlayoptions.add(options1);
+                                            }else {
+                                                OverlayOptions options=showList.get(current_position);
+                                                mBaiduMap.addOverlay(options);
+                                                list_curent_overlayoptions.add(options);
+                                            }
+                                        }
+                                    }
+                                }catch (Exception e){
+                                    e.printStackTrace();
+                                }
                             }
                         });
+                builder.setNeutralButton("取消",null);
+                builder.setCancelable(false);//不可以用返回键取消
                 builder.show();
             }
 
@@ -432,25 +582,38 @@ public class MainActivity extends AppCompatActivity {
         area_btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+               getMncMcc();
                 String filePath = Environment.getExternalStorageDirectory().getPath()+ File.separator+"LuCeIp.txt";
                 File file=new File(filePath);
                 if (file.exists()){
                     ip=read(file);
                 }
                 if(!(ip.equals("")||ip=="")){
-                    interfaceUrl=new InterfaceUrl(ip);
-                    new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            Looper.prepare();//必须在Looper.myLooper()之前
-                            Looper looperTest = Looper.myLooper();
-                            workhandler = new Workhandler(looperTest);//mWorkHandler属于新创建的线程
-                            area_search(marker_latlng);
-                            Looper.loop();
-                        }
-                    }).start();
-                    TimerProgressDialog timerDialog = new TimerProgressDialog(context,10000,"开始下载数据","正在加载数据请稍等");
-                    timerDialog.show();
+                    if (marker_latlng_data.size()==0){
+                        AlertDialog.Builder builder=new AlertDialog.Builder(context);
+                        builder.setTitle("提示");
+                        builder.setMessage("请先在地图上标示出要查询的区域点");
+                        builder.setPositiveButton("确定",null);
+                        builder.show();
+                    }else {
+                        timerProgressDialog1 = null;
+                        timerProgressDialog = null;
+                        interfaceUrl = new InterfaceUrl(ip);
+                        area = true;
+                        first = 0;
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Looper.prepare();//必须在Looper.myLooper()之前
+                                Looper looperTest = Looper.myLooper();
+                                workhandler = new Workhandler(looperTest);//mWorkHandler属于新创建的线程
+                                area_search(marker_latlng_data);
+                                Looper.loop();
+                            }
+                        }).start();
+                        timerProgressDialog1 = new TimerProgressDialog(context, 20000, "开始读取服务器数据", "正在读取数据请稍等");
+                        timerProgressDialog1.show();
+                    }
                 }else {
                     AlertDialog.Builder builder=new AlertDialog.Builder(context);
                     builder.setTitle("提示");
@@ -468,13 +631,16 @@ public class MainActivity extends AppCompatActivity {
         params.put("mnc", mnc );
         params.put("system",zhishi_mode);
         if (latLngs.size()==1){//标注一个点
-            params.put("lon1", String.valueOf(latLngs.get(0).longitude));
-            params.put("lat1", String.valueOf(latLngs.get(0).latitude) );
+            LatLng latLng= Gps2BaiDu.baiduToGps(latLngs.get(0).latitude,latLngs.get(0).longitude);
+            params.put("lon1", String.valueOf(latLng.longitude));
+            params.put("lat1", String.valueOf(latLng.latitude) );
         }else if (latLngs.size()==2){//添加了两个标注
-            params.put("lon1", String.valueOf(latLngs.get(0).longitude));
-            params.put("lat1", String.valueOf(latLngs.get(0).latitude) );
-            params.put("lon2", String.valueOf(latLngs.get(1).longitude));
-            params.put("lat2", String.valueOf(latLngs.get(1).latitude) );
+            LatLng latLng1=Gps2BaiDu.baiduToGps(latLngs.get(0).latitude,latLngs.get(0).longitude);
+            LatLng latLng2=Gps2BaiDu.baiduToGps(latLngs.get(1).latitude,latLngs.get(1).longitude);
+            params.put("lon1", String.valueOf(latLng1.longitude));
+            params.put("lat1", String.valueOf(latLng1.latitude) );
+            params.put("lon2", String.valueOf(latLng2.longitude));
+            params.put("lat2", String.valueOf(latLng2.latitude) );
         }
         OkHttpClient okHttpClient = new OkHttpClient();
         FormBody.Builder builder1 = new FormBody.Builder();
@@ -543,8 +709,7 @@ public class MainActivity extends AppCompatActivity {
                                             + (sublength[0] & 0xff);
                                     msgBuffer = ArrayUtils.subArray(msgBuffer, 4, msgBuffer.length - 4);
 //                                    pointer_package += 4;
-                                }
-                                if (msgBuffer.length >= sublen&&sublen>0) {
+                                }else if (msgBuffer.length >= sublen&&sublen>0) {
                                     i++;
                                     byte[] subdata = ArrayUtils.subArray(msgBuffer, 0, sublen);
                                     msgBuffer = ArrayUtils.subArray(msgBuffer, sublen, msgBuffer.length - sublen);
@@ -571,221 +736,158 @@ public class MainActivity extends AppCompatActivity {
         });
     }
     private int one_package=0;
+    private List<List<Point>> remove_0_after_list=new ArrayList<>();
+    private final static Object object=new Object();
     public class Workhandler extends Handler {
         public Workhandler(Looper looper) {
             super(looper);
         }
+
         public void handleMessage(Message msg) {
-            int count_sum=msg.arg2;
-            if (msg.arg1>0){
-                one_package=msg.arg1;
-                JSONObject object=(JSONObject) msg.obj;
-                try {
-                    JSONArray array=object.getJSONArray("datalist");
-                    for (int i=0;i<array.length();i++){
-                        JSONObject jsonObject= (JSONObject) array.opt(i);
-                        Point point=new Point();
-                        String lon=jsonObject.getString("longdot");
-                        String lat=jsonObject.getString("latdot");
-                        point.setLat(lat);
-                        point.setLon(lon);
-                        if (jsonObject.has("address")){
-                            if (!(jsonObject.getString("address").equals("")||jsonObject.getString("address")==null)){
-                                point.setAcc(jsonObject.getString("address"));
-                            }
-                        }
-                        if (jsonObject.has("power")){
-                            if (!(jsonObject.getString("power").equals("")||jsonObject.getString("power")==null)){
-                                point.setRssi(jsonObject.getString("power"));
-                            }
-                        }
-                        if (jsonObject.has("p1")){
-                            if (!(jsonObject.getString("p1").equals("")||jsonObject.getString("p1")==null)){
-                                point.setP1(jsonObject.getString("p1"));
-                            }
-                        }
-                        if (jsonObject.has("p2")){
-                            if (!(jsonObject.getString("p2").equals("")||jsonObject.getString("p2")==null)){
-                                point.setP2(jsonObject.getString("p2"));
-                            }
-                        }
-                        if (jsonObject.has("p3")){
-                            if (!(jsonObject.getString("p3").equals("")||jsonObject.getString("p3")==null)){
-                                point.setP3(jsonObject.getString("p3"));
-                            }
-                        }
-                        if (luCeDataLists.size()==0){
-                            LuCeDataList luCeDataList=new LuCeDataList();
-                            luCeDataList.setLac_sid(point.getP1());
-                            luCeDataList.setCi_nid(point.getP2());
-                            luCeDataList.setBid(point.getP3());
-                            luCeDataList.setColor(0xff00ffff);
-                            luCeDataList.getList().add(point);
-                            luCeDataLists.add(luCeDataList);
-                        }else {
-                            boolean flag=false;
-                            for (int k=0;k<luCeDataLists.size();k++){
-                                if (point.getP1().equals(luCeDataLists.get(k).getLac_sid())&&point.getP2().equals(luCeDataLists.get(k).getCi_nid())) {
-                                    LuCeDataList luCeDataList = luCeDataLists.get(k);
-                                    luCeDataList.getList().add(point);
-                                    flag = true;
-                                    break;
+            synchronized (object) {
+                int count_sum = msg.arg2;
+                first++;
+                if (msg.arg1 > 0) {
+                    if (first == 1) {
+                        Message message = new Message();
+                        message.arg1 = count_sum;
+                        message.arg2 = 3;
+                        message.obj = msg.arg1;
+                        handler1.sendMessage(message);
+                    }
+                    one_package = msg.arg1;
+                    JSONObject object = (JSONObject) msg.obj;
+                    try {
+                        JSONArray array = object.getJSONArray("datalist");
+                        for (int i = 0; i < array.length(); i++) {
+                            JSONObject jsonObject = (JSONObject) array.opt(i);
+                            Point point = new Point();
+                            String lon = jsonObject.getString("longdot");
+                            String lat = jsonObject.getString("latdot");
+                            point.setLat(lat);
+                            point.setLon(lon);
+                            if (jsonObject.has("address")) {
+                                if (!(jsonObject.getString("address").equals("") || jsonObject.getString("address") == null)) {
+                                    point.setAcc(jsonObject.getString("address"));
                                 }
                             }
-                            if (!flag){
-                                    LuCeDataList luCeDataList=new LuCeDataList();
+                            if (jsonObject.has("power")) {
+                                if (!(jsonObject.getString("power").equals("") || jsonObject.getString("power") == null)) {
+                                    point.setRssi(jsonObject.getString("power"));
+                                }
+                            }
+                            if (jsonObject.has("p1")) {
+                                if (!(jsonObject.getString("p1").equals("") || jsonObject.getString("p1") == null)) {
+                                    point.setP1(jsonObject.getString("p1"));
+                                }
+                            }
+                            if (jsonObject.has("p2")) {
+                                if (!(jsonObject.getString("p2").equals("") || jsonObject.getString("p2") == null)) {
+                                    point.setP2(jsonObject.getString("p2"));
+                                }
+                            }
+                            if (jsonObject.has("p3")) {
+                                if (!(jsonObject.getString("p3").equals("") || jsonObject.getString("p3") == null)) {
+                                    point.setP3(jsonObject.getString("p3"));
+                                }
+                            }
+                            if (luCeDataLists.size() == 0) {
+                                LuCeDataList luCeDataList = new LuCeDataList();
+                                luCeDataList.setLac_sid(point.getP1());
+                                luCeDataList.setCi_nid(point.getP2());
+                                luCeDataList.setBid(point.getP3());
+                                luCeDataList.setColor(0xff00ffff);
+                                luCeDataList.getList().add(point);
+                                luCeDataLists.add(luCeDataList);
+                            } else {
+                                boolean flag = false;
+                                for (int k = 0; k < luCeDataLists.size(); k++) {
+                                    if (point.getP1().equals(luCeDataLists.get(k).getLac_sid()) && point.getP2().equals(luCeDataLists.get(k).getCi_nid())) {
+                                        LuCeDataList luCeDataList = luCeDataLists.get(k);
+                                        luCeDataList.getList().add(point);
+                                        flag = true;
+                                        break;
+                                    }
+                                }
+                                if (!flag) {
+                                    LuCeDataList luCeDataList = new LuCeDataList();
                                     luCeDataList.setLac_sid(point.getP1());
                                     luCeDataList.setCi_nid(point.getP2());
                                     luCeDataList.setBid(point.getP3());
-                                    if (luCeDataLists.size()==1||luCeDataLists.size()>1){
-                                        if (luCeDataLists.size()<7){
-                                            luCeDataList.setColor(color[luCeDataLists.size()-1]);
-                                        } else if (luCeDataLists.size()>6&&luCeDataLists.size()<13){
-                                            luCeDataList.setColor(color[luCeDataLists.size()-7]);
-                                        } else if (luCeDataLists.size()>12&&luCeDataLists.size()<19){
-                                            luCeDataList.setColor(color[luCeDataLists.size()-13]);
-                                        } else if (luCeDataLists.size()>18&&luCeDataLists.size()<25){
-                                            luCeDataList.setColor(color[luCeDataLists.size()-19]);
-                                        }else if (luCeDataLists.size()>24&&luCeDataLists.size()<31){
-                                            luCeDataList.setColor(color[luCeDataLists.size()-25]);
-                                        }else if (luCeDataLists.size()>30&&luCeDataLists.size()<37){
-                                            luCeDataList.setColor(color[luCeDataLists.size()-31]);
-                                        }
+                                    if (luCeDataLists.size() == 1 || luCeDataLists.size() > 1) {
+                                        setColor(luCeDataList,luCeDataLists);
+//                                        if (luCeDataLists.size() < 7) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 1]);
+//                                        } else if (luCeDataLists.size() > 6 && luCeDataLists.size() < 13) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 7]);
+//                                        } else if (luCeDataLists.size() > 12 && luCeDataLists.size() < 19) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 13]);
+//                                        } else if (luCeDataLists.size() > 18 && luCeDataLists.size() < 25) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 19]);
+//                                        } else if (luCeDataLists.size() > 24 && luCeDataLists.size() < 31) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 25]);
+//                                        } else if (luCeDataLists.size() > 30 && luCeDataLists.size() < 37) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 31]);
+//                                        } else if (luCeDataLists.size() > 36 && luCeDataLists.size() < 43) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 37]);
+//                                        } else if (luCeDataLists.size() > 42 && luCeDataLists.size() < 49) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 43]);
+//                                        } else if (luCeDataLists.size() > 48 && luCeDataLists.size() < 55) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 49]);
+//                                        } else if (luCeDataLists.size() > 54 && luCeDataLists.size() < 61) {
+//                                            luCeDataList.setColor(color[luCeDataLists.size() - 55]);
+//                                        }
                                     }
                                     luCeDataList.getList().add(point);
                                     luCeDataLists.add(luCeDataList);
-                            }
-                        }
-                        //对每个小区下的数据集合进行筛选   把距离小于20的数据删掉
-                        for (int i1=0;i1<luCeDataLists.size();i1++){
-                            List<Point> list=luCeDataLists.get(i1).getList();
-                            for (int i2=0;i2<list.size();i2++){
-                                final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(list.get(i2).getLat()),Double.valueOf(list.get(i2).getLon()));
-                                LatLng latLng_start=new LatLng(latlon1[0],latlon1[1]);
-                                final double[] latlon2= GPSUtils.wgs2bd(Double.valueOf(list.get(i2+1).getLat()),Double.valueOf(list.get(i2+1).getLon()));
-                                LatLng latLng_end=new LatLng(latlon2[0],latlon2[1]);
-                                double distance=getDistance(latLng_start,latLng_end);
-                                if (distance<20){
-                                    list.remove(i2);
-                                    i2--;
                                 }
                             }
                         }
-                    }
-                    if (count_sum==one_package){
-                        for (int t=0;t<luCeDataLists.size();t++){
-                            LuceCellInfo luceCellInfo=new LuceCellInfo();
-                            luceCellInfo.setLac_sid(Integer.valueOf(luCeDataLists.get(t).getLac_sid()));
-                            luceCellInfo.setCi_nid(Integer.valueOf(luCeDataLists.get(t).getCi_nid()));
-                            if (!(luCeDataLists.get(t).getBid()==null)){
-                                luceCellInfo.setBid(Integer.valueOf(luCeDataLists.get(t).getBid()));
+                        if (count_sum == one_package) {
+                            workhandler.getLooper().quit();
+                            //把luCeDataLists改成需要的数据
+                            addData(luCeDataLists);
+                            //把得到的所有数据转换成需要的数据格式
+                            List<List<Point>> convex_point = new ArrayList<>();
+                            for (int i = 0; i < remove_0_after_list.size(); i++) {
+                                List<Point> list = remove_0_after_list.get(i);
+                                ConvexHull convexHull = new ConvexHull(list);
+                                List<Point> list_po = convexHull.calculateHull();
+                                convex_point.add(list_po);
                             }
-                            luceCellInfo.setColor(luCeDataLists.get(t).getColor());
-                            luceCellInfos.add(luceCellInfo);
-                            showList_latLngs.add(luCeDataLists.get(t).getList());
-                            List<String> list_rssi=new ArrayList<>();
-                            for (int j=0;j<luCeDataLists.get(t).getList().size();j++){
-                                list_rssi.add(luCeDataLists.get(t).getList().get(j).getRssi());
-                            }
-                            showList_rssi.add(list_rssi);
-                        }
-                        Message message_msg=new Message();
-                        message_msg.arg1=1;
-                        handler1.sendMessage(message_msg);
-//                        workhandler.getLooper().quit();
-                        //把得到的所有数据转换成需要的数据格式
-                        for (int i=0;i<luCeDataLists.size();i++){
-                            LuCeDataList luCeDataList=luCeDataLists.get(i);
-                            List<Point> list=luCeDataLists.get(i).getList();
-//                            showList_latLngs.add(list);
-//                            List<String> list_rssi=new ArrayList<>();
-                            List<LatLng> latLngs=new ArrayList<>();
-//                            for (int j=0;j<list.size();j++){
-//                                list_rssi.add(list.get(j).getRssi());
-//                            }
-//                            showList_rssi.add(list_rssi);
-                            for (int q=0;q<list.size();q++){
-                                Point point= list.get(q);
-                                double lat=Double.valueOf(point.getLat());
-                                double lon=Double.valueOf(point.getLon());
-                                if ((int)lat==0&&(int)lon==0){
-                                    list.remove(point);
-                                    q--;
-                                }
-                            }
-                            ConvexHull convexHull=new ConvexHull(list);
-                            List<Point> list_po=convexHull.calculateHull();
-                            if (list_po.size()>=3){
-                                for (int w=0;w<list_po.size();w++){
-                                    Point point=list_po.get(w);
-                                    final double[] latlon= GPSUtils.wgs2bd(Double.valueOf(point.getLat()),Double.valueOf(point.getLon()));
-                                    LatLng latLng=new LatLng(latlon[0],latlon[1]);
+                            for (int w = 0; w < convex_point.size(); w++) {
+                                List<Point> list_po = convex_point.get(w);
+                                List<LatLng> latLngs = new ArrayList<>();
+                                for (int j = 0; j < list_po.size(); j++) {
+                                    Point point = list_po.get(j);
+                                    final double[] latlon = GPSUtils.wgs2bd(Double.valueOf(point.getLat()), Double.valueOf(point.getLon()));
+                                    LatLng latLng = new LatLng(latlon[0], latlon[1]);
                                     latLngs.add(latLng);
                                 }
-                                if (showList.size()==0){
-                                    OverlayOptions polygonOption = new PolygonOptions()
-                                            .points(latLngs)
-                                            .stroke(new Stroke(5, 0xff00ffff))//color[showList.size()-1]
-                                            .fillColor(0);
-                                    showList.add(polygonOption);
-                                }else if (showList.size()==1||showList.size()>1){
-                                    OverlayOptions polygonOption=null;
-                                    if (showList.size()<7){
-                                        polygonOption = new PolygonOptions()
-                                                .points(latLngs)
-                                                .stroke(new Stroke(5, color[showList.size()-1]))//color[showList.size()-1]
-                                                .fillColor(0);//0x80ffffff
-                                    }else if (showList.size()>6&&showList.size()<13){
-                                        polygonOption = new PolygonOptions()
-                                                .points(latLngs)
-                                                .stroke(new Stroke(5, color[showList.size()-7]))//color[showList.size()-7]
-                                                .fillColor(0);
-                                    }else if (showList.size()>12&&showList.size()<19){
-                                        polygonOption = new PolygonOptions()
-                                                .points(latLngs)
-                                                .stroke(new Stroke(5, color[showList.size()-13]))//color[showList.size()-7]
-                                                .fillColor(0);
-                                    } else if (showList.size()>18&&showList.size()<25){
-                                        polygonOption = new PolygonOptions()
-                                                .points(latLngs)
-                                                .stroke(new Stroke(5, color[showList.size()-19]))//color[showList.size()-7]
-                                                .fillColor(0);
-                                    }else if (showList.size()>24&&showList.size()<31){
-                                        polygonOption = new PolygonOptions()
-                                                .points(latLngs)
-                                                .stroke(new Stroke(5, color[showList.size()-25]))//color[showList.size()-7]
-                                                .fillColor(0);
-                                    }else if (showList.size()>30&&showList.size()<37){
-                                        polygonOption = new PolygonOptions()
-                                                .points(latLngs)
-                                                .stroke(new Stroke(5, color[showList.size()-31]))//color[showList.size()-7]
-                                                .fillColor(0);
-                                    }
-                                    showList.add(polygonOption);
-                                }
-                            }else {
-
+                                latlngs.add(latLngs);
                             }
-                            Point p=new Point();
-                            p.setP1(String.valueOf(luCeDataList.getLac_sid()));
-                            p.setP2(String.valueOf(luCeDataList.getCi_nid()));
-                            p.setP3(String.valueOf(luCeDataList.getBid()));
-                            list_neibor_latlon.add(p);
-                            for (int h=0;h<list_neibor_latlon.size();h++){
-                                if ((list.get(0).getP1().equals(list_neibor_latlon.get(h).getP1()))&&(list.get(0).getP2().equals(list_neibor_latlon.get(h).getP2()))){
-                                    Point point=list_neibor_latlon.get(h);
-                                    point.setLat(list.get(0).getLat());
-                                    point.setLon(list.get(0).getLon());
+                            convex_point.clear();//***************************************************
+                            remove_0_after_list.clear();//***************************************************
+                            //对每个小区下的数据集合进行筛选   把距离小于10的数据删掉
+                            removeData(luCeDataLists);
+                            for (int t = 0; t < luCeDataLists.size(); t++) {
+                                showList_latLngs.add(luCeDataLists.get(t).getList());
+                                List<String> list_rssi = new ArrayList<>();
+                                for (int j = 0; j < luCeDataLists.get(t).getList().size(); j++) {
+                                    list_rssi.add(luCeDataLists.get(t).getList().get(j).getRssi());
                                 }
+                                showList_rssi.add(list_rssi);
                             }
+                            Message message_msg = new Message();
+                            message_msg.arg1 = 1;
+                            handler1.sendMessage(message_msg);
                         }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                }catch (Exception e){
-                    e.printStackTrace();
                 }
-                Log.e("ee","");
-            }
         }
+    }
     }
     Handler handler1=new Handler(){
         @Override
@@ -793,38 +895,121 @@ public class MainActivity extends AppCompatActivity {
             super.handleMessage(msg);
             if (msg.arg1==1){
                 lacDataAdapter.notifyDataSetChanged();
+                if (timerProgressDialog!=null){
+                    timerProgressDialog.dismiss();
+                }
                 AlertDialog.Builder builder=new AlertDialog.Builder(context)
                         .setTitle("提示")
                         .setMessage("区域查询数据已全部加载完毕！")
                         .setPositiveButton("确定",null);
                 builder.show();
+            }else if (msg.arg1==2){
+                if (timerDialog!=null){
+                    timerDialog.dismiss();
+                }
+                AlertDialog.Builder builder=new AlertDialog.Builder(context)
+                        .setTitle("提示")
+                        .setMessage("没有在该区域查询到数据")
+                        .setPositiveButton("确定",null);
+                builder.show();
+            }
+            else if (msg.arg2==3){
+                if (timerProgressDialog1!=null){
+                    timerProgressDialog1.dismiss();
+                }
+                timerProgressDialog = new TimerProgressDialog(context,3*msg.arg1,Integer.valueOf((Integer) msg.obj),"正在加载数据到本地","正在加载数据请稍等");
+                timerProgressDialog.show();
             }
         }
     };
-    /**
-     * 计算两点之间距离
-     * @param start
-     * @param end
-     * @return 米
-     */
-    public double getDistance(LatLng start,LatLng end){
-        double lat1 = (Math.PI/180)*start.latitude;
-        double lat2 = (Math.PI/180)*end.latitude;
 
-        double lon1 = (Math.PI/180)*start.longitude;
-        double lon2 = (Math.PI/180)*end.longitude;
-
-        //地球半径
-        double R = 6371;
-
-        //两点间距离 km，如果想要米的话，结果*1000
-        double d =  Math.acos(Math.sin(lat1)*Math.sin(lat2)+Math.cos(lat1)*Math.cos(lat2)*Math.cos(lon2-lon1))*R;
-        if(d<1)
-            return (int)d*1000;//return (int)d*1000+"m";
-        else
-            return Double.parseDouble(String.format("%.2f",d))*1000;// return String.format("%.2f",d)+"km";
+    private void removeData(List<LuCeDataList> luCeDataLists){
+        for (int i1=0;i1<luCeDataLists.size();i1++){
+            List<Point> list=luCeDataLists.get(i1).getList();
+            if (list.size()>100){
+                int size=list.size()/100;
+                for (int i2=list.size()-1;i2<list.size()&&i2>=0;i2--){
+                    if (!(i2%size==0)){
+                        list.remove(i2);
+//                        i2--;
+                    }
+                }
+            }
+        }
     }
 
+    /**
+     * 添加为需要的数据
+     * @param luCeDataLists
+     */
+    private void addData(List<LuCeDataList> luCeDataLists){
+        for (int t=0;t<luCeDataLists.size();t++){
+            LuceCellInfo luceCellInfo=new LuceCellInfo();
+            luceCellInfo.setLac_sid(Integer.valueOf(luCeDataLists.get(t).getLac_sid()));
+            luceCellInfo.setCi_nid(Integer.valueOf(luCeDataLists.get(t).getCi_nid()));
+            if (!(luCeDataLists.get(t).getBid()==null)){
+                luceCellInfo.setBid(Integer.valueOf(luCeDataLists.get(t).getBid()));
+            }
+            luceCellInfo.setColor(luCeDataLists.get(t).getColor());
+            luceCellInfo.setSize(luCeDataLists.get(t).getList().size());
+            luceCellInfos.add(luceCellInfo);
+        }
+        for (int i=0;i<luCeDataLists.size();i++){
+            LuCeDataList luCeDataList=luCeDataLists.get(i);
+            List<Point> list=luCeDataList.getList();
+            for (int q=0;q<list.size();q++){
+                Point point= list.get(q);
+                double lat=Double.valueOf(point.getLat());
+                double lon=Double.valueOf(point.getLon());
+                if ((int)lat==0&&(int)lon==0){
+                    list.remove(q);
+                    q--;
+                }
+            }
+            remove_0_after_list.add(list);
+            Point p=new Point();
+            p.setP1(String.valueOf(luCeDataList.getLac_sid()));
+            p.setP2(String.valueOf(luCeDataList.getCi_nid()));
+            p.setP3(String.valueOf(luCeDataList.getBid()));
+            list_neibor_latlon.add(p);
+            for (int h=0;h<list_neibor_latlon.size();h++){
+                if ((list.get(0).getP1().equals(list_neibor_latlon.get(h).getP1()))&&(list.get(0).getP2().equals(list_neibor_latlon.get(h).getP2()))){
+                    Point point=list_neibor_latlon.get(h);
+                    point.setLat(list.get(0).getLat());
+                    point.setLon(list.get(0).getLon());
+                }
+            }
+        }
+    }
+    private void setColor(LuCeDataList luCeDataList,List<LuCeDataList> luCeDataLists){
+        if (luCeDataLists.size() < 7) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 1]);
+        } else if (luCeDataLists.size() > 6 && luCeDataLists.size() < 13) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 7]);
+        } else if (luCeDataLists.size() > 12 && luCeDataLists.size() < 19) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 13]);
+        } else if (luCeDataLists.size() > 18 && luCeDataLists.size() < 25) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 19]);
+        } else if (luCeDataLists.size() > 24 && luCeDataLists.size() < 31) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 25]);
+        } else if (luCeDataLists.size() > 30 && luCeDataLists.size() < 37) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 31]);
+        } else if (luCeDataLists.size() > 36 && luCeDataLists.size() < 43) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 37]);
+        } else if (luCeDataLists.size() > 42 && luCeDataLists.size() < 49) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 43]);
+        } else if (luCeDataLists.size() > 48 && luCeDataLists.size() < 55) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 49]);
+        } else if (luCeDataLists.size() > 54 && luCeDataLists.size() < 61) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 55]);
+        }else if (luCeDataLists.size() > 60 && luCeDataLists.size() < 67) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 61]);
+        }else if (luCeDataLists.size() > 66 && luCeDataLists.size() < 73) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 67]);
+        }else if (luCeDataLists.size() > 72 && luCeDataLists.size() < 79) {
+            luCeDataList.setColor(color[luCeDataLists.size() - 73]);
+        }
+    }
     public boolean find(){
         boolean flag=false;
         for (int n=0;n<luceCellInfos.size();n++){
@@ -904,14 +1089,14 @@ public class MainActivity extends AppCompatActivity {
             if(mode_index==2)
             {
                 lac_text.setText("SID");
-                cell_text.setText("NID");
-                bid_liner.setVisibility(View.VISIBLE);
+                cell_text.setText("BID");
+                nid_liner.setVisibility(View.VISIBLE);
             }
             else
             {
                 lac_text.setText("LAC");
                 cell_text.setText("CELL");
-                bid_liner.setVisibility(View.GONE);
+                nid_liner.setVisibility(View.GONE);
 
             }
         }
@@ -925,19 +1110,13 @@ public class MainActivity extends AppCompatActivity {
         lac = lac_edit.getText().toString().trim();
         cellid = cell_edit.getText().toString().trim();
         sid = lac_edit.getText().toString().trim();
-        nid = cell_edit.getText().toString().trim();
-        bid = bid_edit.getText().toString().trim();
+        bid = cell_edit.getText().toString().trim();
+        nid = bid_edit.getText().toString().trim();
+//        nid = cell_edit.getText().toString().trim();
+//        bid = bid_edit.getText().toString().trim();
         if(mode_index== dataCode.cdma)
         {
-//            lac_text.setText("SID:");
-            if(net==2)
-            {
-                mnc = "11";
-            }
-            else
-            {
-                mnc = "03";
-            }
+            mnc = "11";
         }
         if (net == 0)
         {
@@ -1177,8 +1356,8 @@ public class MainActivity extends AppCompatActivity {
         if(mode== dataCode.cdma)
         {
             parameters[0]=sid;
-            parameters[1]=bid;
-            parameters[2]=nid;
+            parameters[1]=nid;
+            parameters[2]=bid;
             luceCellInfo.setLac_sid(Integer.valueOf(sid));
             luceCellInfo.setCi_nid(Integer.valueOf(nid));
             luceCellInfo.setBid(Integer.valueOf(bid));
@@ -1274,7 +1453,7 @@ public class MainActivity extends AppCompatActivity {
                                     msgBuffer = ArrayUtils.subArray(msgBuffer, 4, msgBuffer.length - 4);
 //                                    pointer_package += 4;
                                 }
-                                if (msgBuffer.length >= sublen&&sublen>0) {
+                                else if (msgBuffer.length >= sublen&&sublen>0) {
                                     i++;
                                     byte[] subdata = ArrayUtils.subArray(msgBuffer, 0, sublen);
                                     msgBuffer = ArrayUtils.subArray(msgBuffer, sublen, msgBuffer.length - sublen);
@@ -1347,6 +1526,45 @@ public class MainActivity extends AppCompatActivity {
 //            }
 //        });
     }
+    private void getMncMcc(){
+        if(mode_index== dataCode.cdma)
+        {
+            mnc = "11";
+        }
+        if (net == 0)
+        {
+            mode = mode_index;
+            if (mode_index == dataCode.china_mobile) {
+                mnc = "00";
+            } else if (mode_index == dataCode.china_unicom) {
+                mnc = "01";
+            }
+        }
+        else if (net == 1)//3g
+        {
+            if (mode_index == dataCode.china_mobile) {
+                mnc = "00";
+                mode = dataCode.td_swcdma;
+            } else if (mode_index == dataCode.china_unicom) {
+                mode = dataCode.wcdma;
+                mnc = "01";
+            }
+        }
+        else if (net == 2)//4g
+        {
+            if (mode_index == dataCode.china_mobile) {
+                mode = dataCode.tdd_lte;
+                mnc = "00";
+            } else if (mode_index == dataCode.china_unicom) {
+                mode = dataCode.fdd_lte;
+                mnc = "01";
+            } else {
+                mode = dataCode.fdd_lte;
+                mnc = "01";
+            }
+
+        }
+    }
     private LatLng end_latLng=null;
     private int[] color={0xffff0000,0xff00ff00,0xff0000ff,0xffffff00,0xff00ffff,0xffff00ff};
     Handler handler=new Handler(){
@@ -1354,7 +1572,17 @@ public class MainActivity extends AppCompatActivity {
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             if (msg.arg2==4){
-                Toast.makeText(context,"服务器连接失败，请稍后再试",Toast.LENGTH_SHORT).show();
+                if (timerProgressDialog1!=null){
+                    timerProgressDialog1.dismiss();
+                }
+                if (timerDialog!=null){
+                    timerDialog.dismiss();
+                }
+                AlertDialog.Builder builder=new AlertDialog.Builder(context)
+                        .setTitle("提示")
+                        .setMessage("服务器连接失败，请稍后再试")
+                        .setPositiveButton("确定",null);
+                builder.show();
             }
             List<Point> list=new ArrayList<>();
             List<String> list_rssi=new ArrayList<>();
@@ -1409,6 +1637,15 @@ public class MainActivity extends AppCompatActivity {
                             list.add(point);
                         }
                     }
+                    if (list.size()>100){
+                        int size=list.size()/100;
+                        for (int i2=list.size()-1;i2<list.size()&&i2>=0;i2--){
+                                if (!(i2 % size == 0)) {
+                                    list.remove(i2);
+                                    list_rssi.remove(i2);
+                                }
+                        }
+                    }
                     //按强度渐变添加覆盖物
                     int max_rssi=Integer.valueOf(list_rssi.get(0));
                     int min_rssi=Integer.valueOf(list_rssi.get(0));
@@ -1424,7 +1661,12 @@ public class MainActivity extends AppCompatActivity {
                     showList_latLngs.add(list);
                     showList_rssi.add(list_rssi);
                     for (int i=0;i<list.size();i++){
-                        int rssi_rgb=(Integer.valueOf(list.get(i).getRssi())-min_rssi)*100/(max_rssi-min_rssi);
+                        int rssi_rgb;
+                        if (Integer.valueOf(list.get(i).getRssi())-min_rssi==0||max_rssi-min_rssi==0){
+                            rssi_rgb=0;
+                        }else {
+                            rssi_rgb=(Integer.valueOf(list.get(i).getRssi())-min_rssi)*100/(max_rssi-min_rssi);
+                        }
                         final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(list.get(i).getLat()),Double.valueOf(list.get(i).getLon()));
                         if (!((int)latlon1[0]==0&&(int)latlon1[1]==0)){
                             baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+parameters[0]+","+parameters[1]+","+parameters[2]+"\n"
@@ -1489,6 +1731,9 @@ public class MainActivity extends AppCompatActivity {
                 }
                 lacDataAdapter.notifyDataSetChanged();
                 luceCellInfo=new LuceCellInfo();
+                if (timerDialog!=null){
+                    timerDialog.dismiss();
+                }
             }
         }
     };
@@ -1511,7 +1756,23 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         mMapView.onDestroy();
-        ip="";
+        showList.clear();
+        marker=0;
+        lac="";
+        cellid="";
+        sid="";
+        nid="";
+        bid="";
+        area=false;
+        options=null;
+        marker_latlng.clear();
+        marker_latlng_data.clear();
+        list_curent_overlayoptions.clear();
+        list_neibor_latlon.clear();
+        showList_latLngs.clear();
+        showList_rssi.clear();
+        luceCellInfos.clear();
+        lacDataAdapter.notifyDataSetChanged();
     }
     @Override
     protected void onResume() {
