@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.os.MessageQueue;
+import android.os.PowerManager;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -20,6 +21,7 @@ import android.text.InputType;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -133,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
     String nid="";
     String bid="";
     BaiduMapUtil baiduMapUtil;
+    private PowerManager.WakeLock wakeLock = null;
     public static List<OverlayOptions> showList=new ArrayList<>();
     public List<OverlayOptions> list_curent_overlayoptions=new ArrayList<>();//现在地图上显示的图层
     private String ip="";
@@ -698,6 +701,12 @@ public class MainActivity extends AppCompatActivity {
                                 msgBuffer = ArrayUtils.subArray(msgBuffer, 4, msgBuffer.length - 4);
 //                                pointer_package += 4;
                                 headread = true;
+                                if (size==-1&&datalength==0){
+                                    Message message=new Message();
+                                    message.arg1=2;
+                                    handler1.sendMessage(message);
+                                    break;
+                                }
                             }
                             if (headread) {
                                 //头长度已读
@@ -907,9 +916,15 @@ public class MainActivity extends AppCompatActivity {
                 if (timerDialog!=null){
                     timerDialog.dismiss();
                 }
+                if (timerProgressDialog!=null){
+                    timerProgressDialog.dismiss();
+                }
+                if (timerProgressDialog1!=null){
+                    timerProgressDialog1.dismiss();
+                }
                 AlertDialog.Builder builder=new AlertDialog.Builder(context)
                         .setTitle("提示")
-                        .setMessage("没有在该区域查询到数据")
+                        .setMessage("没有查询到数据")
                         .setPositiveButton("确定",null);
                 builder.show();
             }
@@ -1441,6 +1456,12 @@ public class MainActivity extends AppCompatActivity {
                                 msgBuffer = ArrayUtils.subArray(msgBuffer, 4, msgBuffer.length - 4);
 //                                pointer_package += 4;
                                 headread = true;
+                                if (size==-1&&datalength==0){
+                                    Message message=new Message();
+                                    message.arg1=2;
+                                    handler1.sendMessage(message);
+                                    break;
+                                }
                             }
                             if (headread) {
                                 //头长度已读
@@ -1751,6 +1772,28 @@ public class MainActivity extends AppCompatActivity {
                     PERMISSIONS_STORAGE,
                     REQUEST_EXTERNAL_STORAGE
             );
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        acquireWakeLock();
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        //放在onStart()方法里，保持屏幕常亮
+    }
+    /**
+       * 获取电源锁，保持该服务在屏幕熄灭时仍然获取CPU时，保持运行
+       */
+    private void acquireWakeLock() {
+        if (null == wakeLock) {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK
+                    | PowerManager.ON_AFTER_RELEASE, getClass()
+                    .getCanonicalName());
+            if (null != wakeLock) {
+                wakeLock.acquire();
+            }
         }
     }
     protected void onDestroy() {
