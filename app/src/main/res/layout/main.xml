@@ -262,7 +262,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:text="CI_NID"
+                    android:text="CI_BID"
                     android:textSize="@dimen/text_size_16"
                     android:layout_marginLeft="8dp"
                     android:gravity="center"
@@ -270,7 +270,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:text="BID"
+                    android:text="NID"
                     android:textSize="@dimen/text_size_16"
                     android:layout_marginLeft="8dp"
                     android:gravity="center"
