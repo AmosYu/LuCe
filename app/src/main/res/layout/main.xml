@@ -3,7 +3,27 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
-
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:orientation="horizontal"
+        android:background="@color/blue">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="路测"
+            android:textSize="@dimen/size_18sp"
+            android:textColor="@color/black"/>
+        <Button
+            android:id="@+id/set_ip"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:textSize="@dimen/size_15sp"
+            android:gravity="center"
+            android:text="设置IP"
+            android:layout_alignParentRight="true"></Button>
+    </RelativeLayout>
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
@@ -186,16 +206,6 @@
                 android:layout_height="match_parent">
 
                 <Button
-                    android:id="@+id/btn_qure"
-                    android:layout_weight="1"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:textSize="@dimen/size_15sp"
-                    android:gravity="center"
-                    android:text="查询"
-                    android:background="@drawable/btn_style"
-                    ></Button>
-                <Button
                     android:id="@+id/btn_clear"
                     android:layout_weight="1"
                     android:layout_width="match_parent"
@@ -206,13 +216,13 @@
                     android:background="@drawable/btn_style"
                     ></Button>
                 <Button
-                    android:id="@+id/set_ip"
+                    android:id="@+id/btn_qure"
                     android:layout_weight="1"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:textSize="@dimen/size_15sp"
                     android:gravity="center"
-                    android:text="设置IP"
+                    android:text="查询"
                     android:background="@drawable/btn_style"
                     ></Button>
                 <Button
@@ -262,7 +272,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:text="CI_BID"
+                    android:text="CI_NID"
                     android:textSize="@dimen/text_size_16"
                     android:layout_marginLeft="8dp"
                     android:gravity="center"
@@ -270,7 +280,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:text="NID"
+                    android:text="BID"
                     android:textSize="@dimen/text_size_16"
                     android:layout_marginLeft="8dp"
                     android:gravity="center"
@@ -279,8 +289,8 @@
                     android:id="@+id/txt_list_shou"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:text="收起"
-                    android:textSize="@dimen/text_size_16"
+                    android:text="▼"
+                    android:textSize="@dimen/size_18sp"
                     android:gravity="center_vertical"
                     android:layout_marginLeft="8dp"
                     android:textColor="@color/black"/>

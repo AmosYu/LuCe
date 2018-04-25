@@ -30,6 +30,7 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.PopupWindow;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -102,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
     private Spinner modeSpinner;
     private String[] modes={"中国移动","中国联通","中国电信"};
     private String zhishi_mode="GSM";
-    private String[] zhishis={"GSM","LTE","WCDMA","CDMA","TD-SCDMA","WIFI"};
+    private String[] zhishis={"全部","GSM","LTE","WCDMA","CDMA","TD-SCDMA","WIFI"};
     private ArrayAdapter mncAdapter;
     private ArrayAdapter zhishiAdapter;
 
@@ -157,9 +158,11 @@ public class MainActivity extends AppCompatActivity {
     private TimerProgressDialog timerProgressDialog1;
     private TimerProgressDialog timerDialog;
     private int first=0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getSupportActionBar().hide();
         //在使用SDK各组件之前初始化context信息，传入ApplicationContext
         //注意该方法要再setContentView方法之前实现
         SDKInitializer.initialize(getApplicationContext());
@@ -306,12 +309,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 String txt=txt_list_shou.getText().toString();
-                if (txt.equals("收起")){
+                if (txt.equals("▼")){
                     listView.setVisibility(View.GONE);
-                    txt_list_shou.setText("弹出");
-                }else if (txt.equals("弹出")){
+                    txt_list_shou.setText("▲");
+                }else if (txt.equals("▲")){
                     listView.setVisibility(View.VISIBLE);
-                    txt_list_shou.setText("收起");
+                    txt_list_shou.setText("▼");
                 }
             }
         });
@@ -426,6 +429,11 @@ public class MainActivity extends AppCompatActivity {
                         if (message.equals("")||message==""){
                             Toast.makeText(context,"请输入IP，输入框不能为空",Toast.LENGTH_SHORT);
                         }else {
+                            String filePath = Environment.getExternalStorageDirectory().getPath()+ File.separator+"LuCeIp.txt";
+                            File file=new File(filePath);
+                            if (file.exists()){
+                                file.delete();
+                            }
                             writeMsgToFile(message);
 //                            SharedPreferencesHandler.setDataToPref(context,"luce_ip",message);
                         }
@@ -495,8 +503,13 @@ public class MainActivity extends AppCompatActivity {
                                             }
                                             final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(current_list.get(b).getLat()),Double.valueOf(current_list.get(b).getLon()));
                                             if (!((int)latlon1[0]==0&&(int)latlon1[1]==0)){
-                                                baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+current_list.get(b).getP1()+","+current_list.get(b).getP2()+","+current_list.get(b).getP3()+"\n"
-                                                        +Double.valueOf(current_list.get(b).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                                                if (parameters[2]==null||parameters[2].equals("")){
+                                                    baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+current_list.get(b).getP1()+","+current_list.get(b).getP2()+"\n"
+                                                            +Double.valueOf(current_list.get(b).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                                                }else {
+                                                    baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+current_list.get(b).getP1()+","+current_list.get(b).getP2()+","+current_list.get(b).getP3()+"\n"
+                                                            +Double.valueOf(current_list.get(b).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                                                }
                                             }
                                         }
                                         if (current_list.size()>3){
@@ -555,8 +568,13 @@ public class MainActivity extends AppCompatActivity {
                                         }
                                         final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(current_list.get(i).getLat()),Double.valueOf(current_list.get(i).getLon()));
                                         if (!((int)latlon1[0]==0&&(int)latlon1[1]==0)){
-                                            baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+current_list.get(i).getP1()+","+current_list.get(i).getP2()+","+current_list.get(i).getP3()+"\n"
-                                                    +Double.valueOf(current_list.get(i).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                                            if (parameters[2]==null||parameters[2].equals("")){
+                                                baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+current_list.get(i).getP1()+","+current_list.get(i).getP2()+"\n"
+                                                        +Double.valueOf(current_list.get(i).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                                            }else {
+                                                baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+current_list.get(i).getP1()+","+current_list.get(i).getP2()+","+current_list.get(i).getP3()+"\n"
+                                                        +Double.valueOf(current_list.get(i).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                                            }
                                         }
                                     }
                                     if (current_list.size()>3){
@@ -632,7 +650,11 @@ public class MainActivity extends AppCompatActivity {
         Map<String, String> params = new HashMap<>();
         params.put("mcc", mcc );
         params.put("mnc", mnc );
-        params.put("system",zhishi_mode);
+        if (zhishi_mode.equals("全部")){
+
+        }else {
+            params.put("system",zhishi_mode);
+        }
         if (latLngs.size()==1){//标注一个点
             LatLng latLng= Gps2BaiDu.baiduToGps(latLngs.get(0).latitude,latLngs.get(0).longitude);
             params.put("lon1", String.valueOf(latLng.longitude));
@@ -701,7 +723,7 @@ public class MainActivity extends AppCompatActivity {
                                 msgBuffer = ArrayUtils.subArray(msgBuffer, 4, msgBuffer.length - 4);
 //                                pointer_package += 4;
                                 headread = true;
-                                if (size==-1&&datalength==0){
+                                if (datalength==0){
                                     Message message=new Message();
                                     message.arg1=2;
                                     handler1.sendMessage(message);
@@ -924,7 +946,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 AlertDialog.Builder builder=new AlertDialog.Builder(context)
                         .setTitle("提示")
-                        .setMessage("没有查询到数据")
+                        .setMessage("没有查询到数据,请查看查询信息是否正确")
                         .setPositiveButton("确定",null);
                 builder.show();
             }
@@ -1072,23 +1094,25 @@ public class MainActivity extends AppCompatActivity {
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
             switch (position){
                 case 0:
-                    zhishi_mode="GSM";
+                    zhishi_mode="全部";
                     break;
                 case 1:
-                    zhishi_mode="LTE";
+                    zhishi_mode="GSM";
                     break;
                 case 2:
-                    zhishi_mode="WCDMA";
+                    zhishi_mode="LTE";
                     break;
                 case 3:
-                    zhishi_mode="CDMA";
+                    zhishi_mode="WCDMA";
                     break;
                 case 4:
-                    zhishi_mode="TD-SCDMA";
+                    zhishi_mode="CDMA";
                     break;
                 case 5:
-                    zhishi_mode="WIFI";
+                    zhishi_mode="TD-SCDMA";
                     break;
+                case 6:
+                    zhishi_mode="WIFI";
 
             }
         }
@@ -1101,6 +1125,7 @@ public class MainActivity extends AppCompatActivity {
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
             // btsCtrl.setDetectMode(position);
             mode_index=position;
+            lacDataAdapter.setMode(mode_index);
             if(mode_index==2)
             {
                 lac_text.setText("SID");
@@ -1400,6 +1425,11 @@ public class MainActivity extends AppCompatActivity {
         params.put("p1", parameters[0] );
         params.put("p2", parameters[1] );
         params.put("p3", parameters[2] );
+        if (zhishi_mode.equals("全部")){
+
+        }else {
+            params.put("system",zhishi_mode);
+        }
         OkHttpClient okHttpClient = new OkHttpClient();
         FormBody.Builder builder1 = new FormBody.Builder();
         if (params != null) {
@@ -1456,7 +1486,7 @@ public class MainActivity extends AppCompatActivity {
                                 msgBuffer = ArrayUtils.subArray(msgBuffer, 4, msgBuffer.length - 4);
 //                                pointer_package += 4;
                                 headread = true;
-                                if (size==-1&&datalength==0){
+                                if (datalength==0){
                                     Message message=new Message();
                                     message.arg1=2;
                                     handler1.sendMessage(message);
@@ -1650,7 +1680,11 @@ public class MainActivity extends AppCompatActivity {
                         if (jsonObject.has("acc")){
                             if (!((int)lat1==0&&(int)lon1==0)){
                                 end_latLng=new LatLng(latlon[0],latlon[1]);
-                                baiduMapUtil.addMarker(latlon[0],latlon[1],"基站信息："+parameters[0]+","+parameters[1]+","+parameters[2]+"\n"+"第三方数据",0f,0f,255f,1.0f);
+                                if (parameters[2]==null||parameters[2].equals("")){
+                                    baiduMapUtil.addMarker(latlon[0],latlon[1],"基站信息："+parameters[0]+","+parameters[1]+"\n"+"第三方数据",0f,0f,255f,1.0f);
+                                }else {
+                                    baiduMapUtil.addMarker(latlon[0],latlon[1],"基站信息："+parameters[0]+","+parameters[1]+","+parameters[2]+"\n"+"第三方数据",0f,0f,255f,1.0f);
+                                }
                             }
                         }
                         else if (jsonObject.has("power")){
@@ -1690,8 +1724,13 @@ public class MainActivity extends AppCompatActivity {
                         }
                         final double[] latlon1= GPSUtils.wgs2bd(Double.valueOf(list.get(i).getLat()),Double.valueOf(list.get(i).getLon()));
                         if (!((int)latlon1[0]==0&&(int)latlon1[1]==0)){
-                            baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+parameters[0]+","+parameters[1]+","+parameters[2]+"\n"
-                                    +Double.valueOf(list.get(i).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                            if (parameters[2]==null||parameters[2].equals("")){
+                                baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+parameters[0]+","+parameters[1]+"\n"
+                                        +Double.valueOf(list.get(i).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                            }else {
+                                baiduMapUtil.addMarker(latlon1[0],latlon1[1],"基站信息："+parameters[0]+","+parameters[1]+","+parameters[2]+"\n"
+                                        +Double.valueOf(list.get(i).getRssi())+"",(100-rssi_rgb)*255/100 ,rssi_rgb*255/100,0f,1.0f);
+                            }
                         }
                     }
                     for (int i=0;i<list.size();i++){
